@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #F7F9F7;
+    --foreground: #1E2B21;
+    --card: #FFFFFF;
+    --card-foreground: #1E2B21;
+    --popover: #FFFFFF;
+    --popover-foreground: #1E2B21;
+    --primary: #558062;
+    --primary-foreground: #FFFFFF;
+    --secondary: #EFF3EF;
+    --secondary-foreground: #334F3C;
+    --muted: #E6EFE8;
+    --muted-foreground: #5B7360;
+    --accent: #EBF4ED;
+    --accent-foreground: #24382B;
+    --border: #DDE6DE;
+    --input: #DDE6DE;
+    --ring: #558062;
+    --radius: 0.875rem;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CCD8CE;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8EB799;
+}
+
+/* Selection */
+::selection {
+  background: #D1E2D5;
+  color: #14221A;
+}

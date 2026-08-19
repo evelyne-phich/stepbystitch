@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180" fill="none">
+  <!-- Brand Sage Gradient Background -->
+  <rect width="180" height="180" rx="40" fill="url(#brandGradient)" />
+  
+  <!-- StepByStitch Crochet Logo Icon -->
+  <g transform="translate(36, 36) scale(4.5)" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 13.44 4.442 17.082A2 2 0 0 0 4.982 21H19a2 2 0 0 0 .558-3.921l-1.115-.32A2 2 0 0 1 17 14.837V7.66" />
+    <path d="m7 10.56 12.558-3.642A2 2 0 0 0 19.018 3H5a2 2 0 0 0-.558 3.921l1.115.32A2 2 0 0 1 7 9.163v7.178" />
+  </g>
+
+  <defs>
+    <linearGradient id="brandGradient" x1="0" y1="0" x2="180" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#558062" />
+      <stop offset="1" stop-color="#24382B" />
+    </linearGradient>
+  </defs>
+</svg>
