@@ -53,7 +53,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'StepByStitch - The Ultimate Interactive Crochet Pattern Companion',
-    description: 'Import your crochet PDFs and photos: automatic row-by-row parsing, interactive checkboxes, custom notes, and instant crochet translation.',
+    description: 'Import your crochet PDFs and images: automatic row-by-row parsing, interactive checkboxes, custom notes, and instant crochet translation.',
     url: siteUrl,
     siteName: 'StepByStitch',
     locale: 'en_US',
@@ -70,7 +70,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'StepByStitch - Interactive Checklist & Crochet Pattern Translator',
-    description: 'Transform your PDF and photo patterns into checkable steps with specialized technical translation in 1 click.',
+    description: 'Transform your PDF and image patterns into checkable steps with specialized technical translation in 1 click.',
     images: ['/og-image.png'],
   },
   robots: {
