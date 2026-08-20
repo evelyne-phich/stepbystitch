@@ -56,3 +56,20 @@ body {
   background: #D1E2D5;
   color: #14221A;
 }
+
+@keyframes badgePop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.22) translateY(-2px);
+    box-shadow: 0 10px 25px -4px rgba(62, 92, 70, 0.4), 0 0 0 4px rgba(135, 160, 139, 0.35);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-badge-pop {
+  animation: badgePop 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}

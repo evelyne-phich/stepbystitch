@@ -63,10 +63,22 @@ const STITCH_DEFINITIONS: Record<string, StitchDefinition> = {
     titleEn: 'Magic Ring (MR)',
     descEn: 'Adjustable loop used to start crocheting in the round with no center hole.',
   },
+  'cercle magique': {
+    titleFr: 'Cercle magique (CM)',
+    descFr: 'Boucle ajustable pour commencer un ouvrage en rond sans laisser de trou au centre.',
+    titleEn: 'Magic Ring (MR)',
+    descEn: 'Adjustable loop used to start crocheting in the round with no center hole.',
+  },
   MR: {
     titleFr: 'Cercle magique (MR)',
     descFr: 'Abréviation anglaise pour Magic Ring (cercle magique ajustable).',
     titleEn: 'Magic Ring / Loop',
+    descEn: 'Adjustable starting loop for closed round projects.',
+  },
+  'magic ring': {
+    titleFr: 'Cercle magique (MR / CM)',
+    descFr: 'Boucle ajustable pour démarrer un ouvrage en rond sans laisser de trou central.',
+    titleEn: 'Magic Ring (MR)',
     descEn: 'Adjustable starting loop for closed round projects.',
   },
 
@@ -153,7 +165,7 @@ interface StitchTermProps {
 export function StitchTerm({ term, children }: StitchTermProps) {
   const { t, locale } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
-  const info = STITCH_DEFINITIONS[term];
+  const info = STITCH_DEFINITIONS[term] || STITCH_DEFINITIONS[term.toLowerCase()] || STITCH_DEFINITIONS[term.toUpperCase()];
 
   if (!info) {
     return <span>{children || term}</span>;

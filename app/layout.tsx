@@ -99,13 +99,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={`${sans.variable} ${serif.variable} scroll-smooth overflow-x-hidden`}>
+    <html lang="fr" className={`${sans.variable} ${serif.variable} scroll-smooth`}>
       <head>
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className="min-h-screen bg-yarn-50 text-yarn-900 font-sans antialiased flex flex-col selection:bg-sage-200 selection:text-sage-900 overflow-x-hidden max-w-full">
+      <body className="min-h-screen bg-yarn-50 text-yarn-900 font-sans antialiased flex flex-col selection:bg-sage-200 selection:text-sage-900 max-w-full overflow-x-clip">
         <I18nProvider>
           <JsonLd />
           {children}

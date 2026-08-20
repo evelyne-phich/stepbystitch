@@ -16,15 +16,15 @@ export function DashboardHeader({ userName, userLang }: DashboardHeaderProps) {
   const { t } = useI18n();
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-yarn-200 shadow-soft">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20">
+    <header className="bg-white border-b border-yarn-200 shadow-soft w-full overflow-hidden">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 sm:h-20 gap-2">
           
           {/* Brand */}
-          <div className="flex items-center gap-6">
-            <Link href="/library" className="flex items-center gap-2.5 group">
+          <div className="flex items-center gap-3 sm:gap-6 min-w-0">
+            <Link href="/library" className="flex items-center gap-2 group min-w-0">
               <CrochetLogo size="md" />
-              <span className="text-xl font-bold font-serif text-yarn-900 tracking-tight whitespace-nowrap">
+              <span className="text-base sm:text-xl font-bold font-serif text-yarn-900 tracking-tight truncate">
                 {t.common.brandName}
               </span>
             </Link>
@@ -41,7 +41,7 @@ export function DashboardHeader({ userName, userLang }: DashboardHeaderProps) {
           </div>
 
           {/* Right actions & user profile */}
-          <div className="flex items-center gap-4 lg:gap-6">
+          <div className="flex items-center gap-2 sm:gap-4 lg:gap-6 shrink-0">
             <LanguageSwitcher />
 
             <div className="h-6 w-px bg-yarn-200 hidden sm:block" />

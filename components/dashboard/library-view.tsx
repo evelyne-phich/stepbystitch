@@ -163,7 +163,9 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
               </div>
 
               <div className="pt-4 mt-4 border-t border-yarn-100 flex items-center justify-between text-xs text-yarn-500">
-                <span className="capitalize">{tutorial.level || t.library.allLevels}</span>
+                <span className="capitalize">
+                  {tutorial.level ? ((t.project.levels as any)?.[tutorial.level.toLowerCase()] || tutorial.level) : t.library.allLevels}
+                </span>
                 <span className="font-semibold text-sage-700 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
                   {t.library.openPattern}
                 </span>
