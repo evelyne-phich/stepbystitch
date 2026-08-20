@@ -7,6 +7,7 @@ import { login } from '@/app/(auth)/actions';
 import { useI18n } from '@/lib/i18n/context';
 import { LanguageSwitcher } from '@/components/ui/language-switcher';
 import { CrochetLogo } from '@/components/ui/crochet-logo';
+import { GoogleAuthButton } from '@/components/auth/google-auth-button';
 
 export default function LoginPage() {
   const { t } = useI18n();
@@ -58,6 +59,20 @@ export default function LoginPage() {
               <span>{error}</span>
             </div>
           )}
+
+          {/* Google 1-Click Login */}
+          <div className="mb-6">
+            <GoogleAuthButton label={t.auth.googleContinue} disabled={loading} />
+          </div>
+
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-yarn-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase tracking-wider">
+              <span className="bg-white px-3 text-yarn-500 font-medium">{t.auth.orDivider}</span>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>

@@ -1,12 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-
-function sanitizeSupabaseUrl(url: string | undefined): string {
-  if (!url) return 'https://mock.supabase.co';
-  let cleaned = url.trim().replace(/\/+$/, '');
-  cleaned = cleaned.replace(/\/(auth|rest|storage)\/v\d+.*$/, '');
-  return cleaned.replace(/\/+$/, '') || 'https://mock.supabase.co';
-}
+import type { Database } from '@/lib/types/database';
 
 /**
  * Updates and refreshes Supabase authentication sessions in the Next.js middleware pipeline.
@@ -16,11 +10,14 @@ export async function updateSession(request: NextRequest) {
     request,
   });
 
-  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseUrl = sanitizeSupabaseUrl(rawUrl);
-  const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'mock-anon-key').trim();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  const supabase = createServerClient(
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return supabaseResponse;
+  }
+
+  const supabase = createServerClient<Database>(
     supabaseUrl,
     supabaseAnonKey,
     {
@@ -57,7 +54,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // If user is not authenticated and attempts to access protected routes
-  if (!user && isDashboardRoute && rawUrl && !rawUrl.includes('mock')) {
+  if (!user && isDashboardRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('redirect', request.nextUrl.pathname);

@@ -45,6 +45,15 @@ export async function signup(formData: FormData) {
     return { error: 'Please provide both email and a password.' };
   }
 
+  // Anti-abuse: Block disposable temporary email providers
+  const { isDisposableEmail } = await import('@/lib/auth/email-validator');
+  if (isDisposableEmail(email)) {
+    return {
+      error:
+        'Les adresses e-mails temporaires ou jetables ne sont pas acceptées. Merci d’utiliser une adresse e-mail permanente (Gmail, Outlook, iCloud, etc.).',
+    };
+  }
+
   if (password.length < 6) {
     return { error: 'Password must be at least 6 characters long.' };
   }
