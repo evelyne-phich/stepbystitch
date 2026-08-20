@@ -14,7 +14,7 @@ export async function login(formData: FormData) {
   const password = formData.get('password') as string;
 
   if (!email || !password) {
-    return { error: 'Please provide both email and password.' };
+    return { errorCode: 'MISSING_FIELDS' };
   }
 
   const { error } = await supabase.auth.signInWithPassword({
@@ -23,7 +23,7 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
-    return { error: error.message || 'Invalid login credentials.' };
+    return { errorCode: 'INVALID_CREDENTIALS', rawMessage: error.message };
   }
 
   revalidatePath('/', 'layout');
@@ -42,20 +42,17 @@ export async function signup(formData: FormData) {
   const languePreferee = (formData.get('languePreferee') as string) || 'fr';
 
   if (!email || !password) {
-    return { error: 'Please provide both email and a password.' };
+    return { errorCode: 'MISSING_FIELDS' };
   }
 
   // Anti-abuse: Block disposable temporary email providers
   const { isDisposableEmail } = await import('@/lib/auth/email-validator');
   if (isDisposableEmail(email)) {
-    return {
-      error:
-        'Les adresses e-mails temporaires ou jetables ne sont pas acceptées. Merci d’utiliser une adresse e-mail permanente (Gmail, Outlook, iCloud, etc.).',
-    };
+    return { errorCode: 'DISPOSABLE_EMAIL' };
   }
 
   if (password.length < 6) {
-    return { error: 'Password must be at least 6 characters long.' };
+    return { errorCode: 'PASSWORD_TOO_SHORT' };
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -70,7 +67,7 @@ export async function signup(formData: FormData) {
   });
 
   if (error) {
-    return { error: error.message || 'Error creating account.' };
+    return { errorCode: 'AUTH_ERROR', rawMessage: error.message };
   }
 
   // If user session is established immediately
@@ -79,7 +76,7 @@ export async function signup(formData: FormData) {
     redirect('/library');
   }
 
-  return { success: true, message: 'Account created successfully! If email verification is enabled, please check your inbox.' };
+  return { success: true, messageCode: 'SIGNUP_SUCCESS_CONFIRM' };
 }
 
 /**

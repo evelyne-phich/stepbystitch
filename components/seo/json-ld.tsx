@@ -5,7 +5,7 @@ export function JsonLd() {
       {
         "@type": "SoftwareApplication",
         "@id": "https://stepbystitch.app/#software",
-        "name": "StepByStitch",
+        "name": "Step by Stitch",
         "url": "https://stepbystitch.app",
         "description": "Bibliothèque personnelle et lecteur intelligent de patrons de crochet. Transforme vos PDF et captures d'écran en checklists interactives, éditables, annotables et traduisibles à la demande.",
         "applicationCategory": "LifestyleApplication",
@@ -32,15 +32,15 @@ export function JsonLd() {
             "name": "Comment transformer un patron crochet PDF en checklist interactive ?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Il vous suffit d'importer votre fichier PDF ou vos captures d'écran sur StepByStitch. L'intelligence artificielle extrait le texte, identifie le matériel, les tours et les rangs, et génère une liste d'étapes que vous pouvez cocher, corriger et annoter à votre rythme."
+              "text": "Il vous suffit d'importer votre fichier PDF, vos images ou de coller le texte de votre patron sur Step by Stitch. Notre moteur de reconnaissance extrait le texte, identifie le matériel, les tours et les rangs, et génère une liste d'étapes que vous pouvez cocher, corriger et annoter à votre rythme."
             }
           },
           {
             "@type": "Question",
-            "name": "StepByStitch peut-il traduire un patron de crochet en anglais (US ou UK) vers le français ?",
+            "name": "Step by Stitch peut-il traduire un patron de crochet en anglais (US ou UK) vers le français ?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Oui, absolument ! StepByStitch intègre un moteur de traduction spécialisé dans le vocabulaire technique du crochet. Il convertit avec précision les abréviations (comme sc, dc, hdc, inc, dec) en termes français correspondants (ms, br, db, aug, dim) sans altérer le nombre de mailles."
+              "text": "Oui, absolument ! Step by Stitch intègre un moteur de traduction spécialisé dans le vocabulaire technique du crochet. Il convertit avec précision les abréviations (comme sc, dc, hdc, inc, dec) en termes français correspondants (ms, br, db, aug, dim) sans altérer le nombre de mailles."
             }
           },
           {
@@ -64,7 +64,7 @@ export function JsonLd() {
       {
         "@type": "HowTo",
         "@id": "https://stepbystitch.app/#howto",
-        "name": "Comment suivre et traduire un patron de crochet avec StepByStitch",
+        "name": "Comment suivre et traduire un patron de crochet avec Step by Stitch",
         "description": "Guide étape par étape pour transformer un patron PDF ou une capture d'écran en instructions de crochet interactives.",
         "step": [
           {
@@ -87,7 +87,7 @@ export function JsonLd() {
       {
         "@type": "Organization",
         "@id": "https://stepbystitch.app/#organization",
-        "name": "StepByStitch",
+        "name": "Step by Stitch",
         "url": "https://stepbystitch.app",
         "logo": "https://stepbystitch.app/logo.png"
       }

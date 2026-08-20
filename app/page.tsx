@@ -59,7 +59,7 @@ export default function HomePage() {
               <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   href="/signup"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full text-base font-bold text-white bg-gradient-to-r from-sage-800 via-sage-700 to-sage-600 hover:from-sage-900 hover:to-sage-700 shadow-lift hover:shadow-2xl transition-all transform hover:-translate-y-0.5"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl text-base font-bold text-white bg-gradient-to-r from-sage-800 via-sage-700 to-sage-600 hover:from-sage-900 hover:to-sage-700 shadow-lift hover:shadow-2xl transition-all transform hover:-translate-y-0.5"
                 >
                   <span>{t.landing.ctaPrimary}</span>
                   <ArrowRight className="w-5 h-5" />
@@ -67,7 +67,7 @@ export default function HomePage() {
 
                 <Link
                   href="#demo"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-4 rounded-full text-base font-semibold text-yarn-800 bg-white hover:bg-yarn-100 border border-yarn-300 shadow-soft transition-all"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl text-base font-semibold text-yarn-800 bg-white hover:bg-yarn-100 border border-yarn-300 shadow-soft transition-all"
                 >
                   <Sparkles className="w-4 h-4 text-sage-600" />
                   <span>{t.landing.ctaSecondary}</span>
@@ -242,7 +242,7 @@ export default function HomePage() {
 
               <Link
                 href={locale === 'fr' ? '/guide-abbreviations-crochet' : '/crochet-abbreviations-guide'}
-                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full text-sm font-bold text-yarn-900 bg-white hover:bg-yarn-100 shadow-soft hover:shadow-lift transition-all whitespace-nowrap"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-sm font-bold text-yarn-900 bg-white hover:bg-yarn-100 shadow-soft hover:shadow-lift transition-all whitespace-nowrap"
               >
                 <span>{t.landing.teaserButton}</span>
                 <ArrowRight className="w-4 h-4" />
@@ -275,7 +275,7 @@ export default function HomePage() {
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
                 href="/signup"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-9 py-4 rounded-full text-base font-bold text-white bg-gradient-to-r from-sage-800 via-sage-700 to-sage-600 hover:from-sage-900 hover:to-sage-700 shadow-lift transition-all transform hover:-translate-y-0.5"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-9 py-4 rounded-2xl text-base font-bold text-white bg-gradient-to-r from-sage-800 via-sage-700 to-sage-600 hover:from-sage-900 hover:to-sage-700 shadow-lift transition-all transform hover:-translate-y-0.5"
               >
                 <span>{t.landing.ctaPrimary}</span>
                 <ArrowRight className="w-5 h-5" />

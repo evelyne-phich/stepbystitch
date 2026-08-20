@@ -27,11 +27,19 @@ export default function SignupPage() {
 
     const result = await signup(formData);
 
-    if (result?.error) {
-      setError(result.error);
+    if (result?.errorCode) {
+      if (result.errorCode === 'DISPOSABLE_EMAIL') {
+        setError(t.auth.errorDisposableEmail);
+      } else if (result.errorCode === 'MISSING_FIELDS') {
+        setError(t.auth.errorMissingFields);
+      } else if (result.errorCode === 'PASSWORD_TOO_SHORT') {
+        setError(t.auth.errorPasswordTooShort);
+      } else {
+        setError(result.rawMessage || t.auth.errorGenericAuth);
+      }
       setLoading(false);
-    } else if (result?.message) {
-      setSuccessMessage(result.message);
+    } else if (result?.messageCode === 'SIGNUP_SUCCESS_CONFIRM') {
+      setSuccessMessage(t.auth.signupSuccessMessage);
       setLoading(false);
     }
   };
@@ -102,7 +110,7 @@ export default function SignupPage() {
                   id="fullName"
                   name="fullName"
                   type="text"
-                  placeholder="Name"
+                  placeholder={t.auth.fullNamePlaceholder}
                   className="block w-full pl-10 pr-4 py-3 rounded-2xl border border-yarn-300 text-yarn-900 placeholder:text-yarn-400 focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent text-sm bg-yarn-50/50"
                 />
               </div>
@@ -122,7 +130,7 @@ export default function SignupPage() {
                   type="email"
                   required
                   autoComplete="email"
-                  placeholder="name@email.com"
+                  placeholder={t.auth.emailPlaceholder}
                   className="block w-full pl-10 pr-4 py-3 rounded-2xl border border-yarn-300 text-yarn-900 placeholder:text-yarn-400 focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent text-sm bg-yarn-50/50"
                 />
               </div>
@@ -143,7 +151,7 @@ export default function SignupPage() {
                   required
                   minLength={6}
                   autoComplete="new-password"
-                  placeholder="••••••••"
+                  placeholder={t.auth.passwordPlaceholder}
                   className="block w-full pl-10 pr-4 py-3 rounded-2xl border border-yarn-300 text-yarn-900 placeholder:text-yarn-400 focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent text-sm bg-yarn-50/50"
                 />
               </div>

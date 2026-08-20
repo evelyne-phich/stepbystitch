@@ -92,7 +92,7 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/#demo" className="hover:text-white transition-colors">
-                  {t.common.interactiveDemo}
+                  {t.common.demo}
                 </Link>
               </li>
             </ul>
@@ -124,7 +124,7 @@ export function Footer() {
         </div>
 
         <div className="mt-12 pt-8 border-t border-yarn-800 flex flex-col sm:flex-row items-center justify-between text-xs text-yarn-400 gap-4">
-          <p>© {new Date().getFullYear()} StepByStitch. {t.common.allRightsReserved}</p>
+          <p>© {new Date().getFullYear()} {t.common.brandName}. {t.common.allRightsReserved}</p>
           <p className="flex items-center gap-4">
             <span>{t.landing.badgePrivate}</span>
             <span>•</span>

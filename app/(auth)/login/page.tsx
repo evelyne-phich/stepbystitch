@@ -22,8 +22,14 @@ export default function LoginPage() {
     const formData = new FormData(e.currentTarget);
     const result = await login(formData);
 
-    if (result?.error) {
-      setError(result.error);
+    if (result?.errorCode) {
+      if (result.errorCode === 'MISSING_FIELDS') {
+        setError(t.auth.errorMissingFields);
+      } else if (result.errorCode === 'INVALID_CREDENTIALS') {
+        setError(t.auth.errorInvalidCredentials);
+      } else {
+        setError(result.rawMessage || t.auth.errorGenericAuth);
+      }
       setLoading(false);
     }
   };
@@ -89,7 +95,7 @@ export default function LoginPage() {
                   type="email"
                   required
                   autoComplete="email"
-                  placeholder="name@email.com"
+                  placeholder={t.auth.emailPlaceholder}
                   className="block w-full pl-10 pr-4 py-3 rounded-2xl border border-yarn-300 text-yarn-900 placeholder:text-yarn-400 focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent text-sm bg-yarn-50/50"
                 />
               </div>
@@ -109,7 +115,7 @@ export default function LoginPage() {
                   type="password"
                   required
                   autoComplete="current-password"
-                  placeholder="••••••••"
+                  placeholder={t.auth.passwordPlaceholder}
                   className="block w-full pl-10 pr-4 py-3 rounded-2xl border border-yarn-300 text-yarn-900 placeholder:text-yarn-400 focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent text-sm bg-yarn-50/50"
                 />
               </div>

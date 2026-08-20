@@ -151,7 +151,7 @@ interface StitchTermProps {
 }
 
 export function StitchTerm({ term, children }: StitchTermProps) {
-  const { locale } = useI18n();
+  const { t, locale } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const info = STITCH_DEFINITIONS[term];
 
@@ -188,7 +188,7 @@ export function StitchTerm({ term, children }: StitchTermProps) {
               {term}
             </span>
             <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-yarn-800 text-yarn-300">
-              {isFr ? 'Point crochet' : 'Stitch Term'}
+              {t.common.stitchTermBadge}
             </span>
           </div>
 

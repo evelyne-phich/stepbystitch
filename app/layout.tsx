@@ -21,8 +21,8 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://stepbystitch.app';
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'StepByStitch - Crochet Pattern Reader, Interactive Checklist & Translator',
-    template: '%s | StepByStitch',
+    default: 'Step by Stitch - Crochet Pattern Reader, Interactive Checklist & Translator',
+    template: '%s | Step by Stitch',
   },
   description: 'Transform your crochet PDF patterns and screenshots into interactive, editable, and translatable checklists (US / UK / FR). Keep all your patterns privately accessible anywhere.',
   keywords: [
@@ -36,9 +36,9 @@ export const metadata: Metadata = {
     'crochet pattern tracker',
     'crochet companion app',
   ],
-  authors: [{ name: 'StepByStitch' }],
-  creator: 'StepByStitch',
-  publisher: 'StepByStitch',
+  authors: [{ name: 'Step by Stitch' }],
+  creator: 'Step by Stitch',
+  publisher: 'Step by Stitch',
   formatDetection: {
     email: false,
     address: false,
@@ -52,10 +52,10 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: 'StepByStitch - The Ultimate Interactive Crochet Pattern Companion',
+    title: 'Step by Stitch - The Ultimate Interactive Crochet Pattern Companion',
     description: 'Import your crochet PDFs and images: automatic row-by-row parsing, interactive checkboxes, custom notes, and instant crochet translation.',
     url: siteUrl,
-    siteName: 'StepByStitch',
+    siteName: 'Step by Stitch',
     locale: 'en_US',
     type: 'website',
     images: [

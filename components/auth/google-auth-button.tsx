@@ -3,14 +3,16 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useI18n } from '@/lib/i18n/context';
 
 export function GoogleAuthButton({
-  label = 'Continuer avec Google',
+  label,
   disabled = false,
 }: {
   label?: string;
   disabled?: boolean;
 }) {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
@@ -65,7 +67,7 @@ export function GoogleAuthButton({
           />
         </svg>
       )}
-      <span>{label}</span>
+      <span>{label || t.auth.googleContinue}</span>
     </button>
   );
 }

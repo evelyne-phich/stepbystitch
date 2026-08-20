@@ -24,48 +24,35 @@ const ROUTE_TRANSLATIONS: Record<string, { fr: string; en: string }> = {
 };
 
 export function LanguageSwitcher({ className = '' }: { className?: string }) {
-  const { locale, setLocale } = useI18n();
+  const { t, locale, setLocale } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
 
-  const handleSwitch = (newLocale: Locale) => {
-    setLocale(newLocale);
+  const handleToggle = () => {
+    const nextLocale: Locale = locale === 'fr' ? 'en' : 'fr';
+    setLocale(nextLocale);
 
     // If on a language-specific URL, redirect to the localized URL version
     if (pathname && ROUTE_TRANSLATIONS[pathname]) {
-      const targetUrl = ROUTE_TRANSLATIONS[pathname][newLocale];
+      const targetUrl = ROUTE_TRANSLATIONS[pathname][nextLocale];
       if (targetUrl && targetUrl !== pathname) {
         router.push(targetUrl);
       }
     }
   };
 
+  const titleTooltip = t.common.switchLangTooltip;
+
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yarn-100/90 border border-yarn-300/80 text-xs font-medium text-yarn-800 ${className}`}>
-      <Globe className="w-3.5 h-3.5 text-yarn-600" />
-      <button
-        type="button"
-        onClick={() => handleSwitch('fr')}
-        className={`px-1.5 py-0.5 rounded transition-all ${
-          locale === 'fr'
-            ? 'font-bold bg-white text-yarn-950 shadow-xs'
-            : 'text-yarn-600 hover:text-yarn-900'
-        }`}
-      >
-        FR
-      </button>
-      <span className="text-yarn-300">|</span>
-      <button
-        type="button"
-        onClick={() => handleSwitch('en')}
-        className={`px-1.5 py-0.5 rounded transition-all ${
-          locale === 'en'
-            ? 'font-bold bg-white text-yarn-950 shadow-xs'
-            : 'text-yarn-600 hover:text-yarn-900'
-        }`}
-      >
-        EN
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={handleToggle}
+      title={titleTooltip}
+      aria-label={titleTooltip}
+      className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-yarn-100/90 hover:bg-yarn-200/80 border border-yarn-300/80 text-xs font-bold text-yarn-900 transition-all hover:scale-105 active:scale-95 shadow-xs ${className}`}
+    >
+      <Globe className="w-3.5 h-3.5 text-sage-700 flex-shrink-0" />
+      <span className="uppercase tracking-wider">{locale}</span>
+    </button>
   );
 }

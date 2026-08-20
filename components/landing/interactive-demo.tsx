@@ -123,8 +123,8 @@ export function InteractiveDemo() {
             </div>
 
             <div className="bg-yarn-50/70 rounded-2xl p-4 font-mono text-xs text-yarn-800 leading-relaxed space-y-2 border border-yarn-200/60 select-none">
-              <div className="text-yarn-500 font-semibold">// Pattern: Cute Amigurumi Head</div>
-              <div>Hook: 3.5 mm (E-4) | Yarn: DK Cotton</div>
+              <div className="text-yarn-500 font-semibold">{t.demo.rawPatternTitle}</div>
+              <div>{t.demo.rawPatternDetails}</div>
               <div className="h-2"></div>
               {INITIAL_ITEMS.map((item) => (
                 <div key={item.id} className="hover:text-yarn-950 transition-colors">
@@ -203,7 +203,7 @@ export function InteractiveDemo() {
                   >
                     <button
                       type="button"
-                      aria-label="Check round"
+                      aria-label={t.demo.checkRound}
                       className="mt-0.5 flex-shrink-0 text-yarn-700 hover:text-yarn-900 transition-colors"
                     >
                       {item.checked ? (
