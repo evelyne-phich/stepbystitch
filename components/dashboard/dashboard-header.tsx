@@ -35,7 +35,7 @@ export function DashboardHeader({ userName, userLang }: DashboardHeaderProps) {
                 className="px-3.5 py-2 rounded-xl text-sm font-semibold text-yarn-900 bg-yarn-100/80 flex items-center gap-2"
               >
                 <Layers className="w-4 h-4 text-yarn-700" />
-                <span>{t.common.myPatterns}</span>
+                <span>{t.common.myLibrary}</span>
               </Link>
             </nav>
           </div>
@@ -45,15 +45,6 @@ export function DashboardHeader({ userName, userLang }: DashboardHeaderProps) {
             <LanguageSwitcher />
 
             <div className="h-6 w-px bg-yarn-200 hidden sm:block" />
-
-            <Link
-              href="/library/new"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-sage-800 to-sage-600 hover:from-sage-900 hover:to-sage-700 shadow-soft hover:shadow-lift transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">{t.common.importPattern}</span>
-              <span className="sm:hidden">{t.common.importPattern.split(' ')[0]}</span>
-            </Link>
 
             {/* User avatar badge */}
             <div className="flex items-center gap-2">

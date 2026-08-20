@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search, BookOpen, FileText } from 'lucide-react';
+import { Plus, Search, BookOpen, FileText, Image as ImageIcon, AlignLeft } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/context';
 import type { Tutorial } from '@/lib/types/database';
 
@@ -139,9 +139,12 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase bg-yarn-100 text-yarn-700">
-                    <FileText className="w-3 h-3" />
-                    {tutorial.source_type.toUpperCase()}
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold uppercase bg-yarn-100 text-yarn-700">
+                    {tutorial.source_type === 'pdf' && <FileText className="w-3 h-3 text-sage-600" />}
+                    {tutorial.source_type === 'image' && <ImageIcon className="w-3 h-3 text-sage-600" />}
+                    {tutorial.source_type === 'text' && <AlignLeft className="w-3 h-3 text-sage-600" />}
+                    {tutorial.source_type === 'manuscrit' && <FileText className="w-3 h-3 text-sage-600" />}
+                    <span>{tutorial.source_type.toUpperCase()}</span>
                   </span>
                   <span className="text-[11px] text-yarn-400 font-mono">
                     {new Date(tutorial.saved_at).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US')}
