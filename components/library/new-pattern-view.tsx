@@ -39,9 +39,9 @@ export function NewPatternView({ quota }: NewPatternViewProps) {
 
         {/* Quota Badge */}
         {!quota.isUnlimited && (
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-yarn-200 shadow-soft self-start sm:self-auto">
-            <span className="w-2 h-2 rounded-full bg-sage-500 animate-pulse" />
-            <span className="text-yarn-700">
+          <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-yarn-200 shadow-soft self-start sm:self-auto">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />
+            <span className="text-yarn-700 whitespace-nowrap">
               {t.upload.freePlanPrefix}{' '}
               <strong className="text-yarn-950 font-bold">
                 {quota.currentCount} / {quota.maxAllowed}

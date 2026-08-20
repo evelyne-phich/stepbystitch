@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server';
+import { createHash } from 'crypto';
+import { createServerClient, createAdminClient } from '@/lib/supabase/server';
 import { parsePatternWithGemini, type ParsePatternInput } from '@/lib/ai/client';
+import { CROCHET_PARSER_SYSTEM_INSTRUCTION } from '@/lib/ai/prompts';
 import { checkUserUploadQuota, recordAiTokenUsage } from '@/lib/ai/usage-tracker';
 import type { SourceType } from '@/lib/types/database';
 
-export const maxDuration = 60; // Allow up to 60 seconds for AI processing and PDF OCR
+export const maxDuration = 120; // Allow up to 120 seconds for multi-page AI OCR and parsing
 
 export async function POST(request: NextRequest) {
   const requestStartTime = Date.now();
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Process files into Buffers
+    // 4. Process files into Buffers and compute SHA-256 content hash
     const aiFiles: NonNullable<ParsePatternInput['files']> = [];
     let primarySourceType: SourceType = 'text';
     let primaryFilePath = 'raw_text';
@@ -85,6 +87,11 @@ export async function POST(request: NextRequest) {
     let primaryFileType: string | null = null;
 
     const tutorialId = crypto.randomUUID();
+    const sha256Hasher = createHash('sha256');
+
+    // Automatically bind the current system prompt instructions into the SHA-256 hash.
+    // Any prompt or rules refinement will automatically bust stale cache with zero manual version management!
+    sha256Hasher.update(CROCHET_PARSER_SYSTEM_INSTRUCTION);
 
     if (files.length > 0) {
       const firstFile = files[0];
@@ -93,11 +100,14 @@ export async function POST(request: NextRequest) {
       primaryFileName = firstFile.name;
       primaryFileType = firstFile.type;
 
-      // Upload files to Supabase Private Storage `patterns` bucket
+      // Upload files to Supabase Private Storage `tutorial_files` bucket
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
+
+        // Feed buffer into SHA-256 hasher for cache detection
+        sha256Hasher.update(buffer);
 
         aiFiles.push({
           buffer,
@@ -114,11 +124,11 @@ export async function POST(request: NextRequest) {
         }
 
         console.log(
-          `[API /api/parse-pattern] ☁️ Uploading "${file.name}" to storage bucket "patterns" at path "${storagePath}"...`
+          `[API /api/parse-pattern] ☁️ Uploading "${file.name}" to storage bucket "tutorial_files" at path "${storagePath}"...`
         );
 
         const { error: uploadError } = await supabase.storage
-          .from('patterns')
+          .from('tutorial_files')
           .upload(storagePath, buffer, {
             contentType: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
             upsert: false,
@@ -126,36 +136,157 @@ export async function POST(request: NextRequest) {
 
         if (uploadError) {
           console.error(`[API /api/parse-pattern] ❌ Storage upload failed for "${file.name}":`, uploadError);
-          // Non-blocking: continue if AI can still parse, but log error
         } else {
           console.log(`[API /api/parse-pattern] ✅ File uploaded successfully to private storage.`);
         }
       }
+    } else {
+      // Feed trimmed text into SHA-256 hasher
+      sha256Hasher.update(rawText.trim());
     }
 
-    // 5. Call Gemini Multimodal AI extraction
-    console.log(`[API /api/parse-pattern] 🤖 Triggering Gemini AI extraction pipeline...`);
-    const aiResult = await parsePatternWithGemini({
-      files: aiFiles.length > 0 ? aiFiles : undefined,
-      rawText: rawText.trim() || undefined,
-      userHint: userNote.trim() || undefined,
-    });
+    const contentHash = sha256Hasher.digest('hex');
+    console.log(`[API /api/parse-pattern] 🔑 SHA-256 hash computed: ${contentHash}`);
 
-    const { pattern, usage } = aiResult;
+    // 5. Check if this exact pattern is ALREADY in the current user's library
+    const { data: userExistingTutorial } = await (supabase.from('tutorials') as any)
+      .select('id, title')
+      .eq('user_id', user.id)
+      .eq('raw_content', `hash:${contentHash}`)
+      .limit(1);
+
+    if (userExistingTutorial && userExistingTutorial.length > 0) {
+      console.log(
+        `[API /api/parse-pattern] ℹ️ Pattern already exists in user's library: ${userExistingTutorial[0].id}`
+      );
+      return NextResponse.json({
+        success: true,
+        alreadyExists: true,
+        tutorialId: userExistingTutorial[0].id,
+        title: userExistingTutorial[0].title,
+      });
+    }
+
+    // 6. Check Permanent Pattern Cache (to bypass Gemini even if original project was deleted)
+    let pattern: any = null;
+    let isCacheHit = false;
+
+    try {
+      const adminClient = await createAdminClient();
+
+      // Step 6A: Check dedicated permanent cache table
+      const { data: cachedRows, error: cacheRowErr } = await (adminClient.from('pattern_cache') as any)
+        .select('*')
+        .eq('content_hash', contentHash)
+        .limit(1);
+
+      if (!cacheRowErr && cachedRows && cachedRows.length > 0) {
+        const cached = cachedRows[0];
+        console.log(
+          `[API /api/parse-pattern] ⚡ PERMANENT CACHE HIT for SHA-256 ${contentHash}! Bypassing Gemini AI!`
+        );
+        pattern = {
+          title: cached.title,
+          language: cached.language,
+          project_type: cached.project_type,
+          level: cached.level,
+          hook_size: cached.stitch,
+          materials: cached.materials || [],
+          gauge: cached.gauge,
+          summary: cached.summary,
+          sections: Array.isArray(cached.sections) ? cached.sections : [],
+          steps: Array.isArray(cached.steps) ? cached.steps : [],
+        };
+        isCacheHit = true;
+      }
+
+      // Step 6B: Fallback check in tutorials table
+      if (!pattern) {
+        const { data: cachedTutorials, error: cacheErr } = await (adminClient.from('tutorials') as any)
+          .select('id, title, stitch, level, project_type, materials, gauge, raw_content_language, note')
+          .eq('raw_content', `hash:${contentHash}`)
+          .limit(1);
+
+        if (!cacheErr && cachedTutorials && cachedTutorials.length > 0) {
+          const cachedTut = cachedTutorials[0] as any;
+          const { data: cachedSteps, error: stepsErr } = await (adminClient.from('checklist_items') as any)
+            .select('label, section, order_index, note')
+            .eq('tutorial_id', cachedTut.id)
+            .order('order_index', { ascending: true });
+
+          if (!stepsErr && cachedSteps && cachedSteps.length > 0) {
+            console.log(
+              `[API /api/parse-pattern] ⚡ TUTORIALS CACHE HIT! Reusing parsed pattern (${cachedSteps.length} steps) for SHA-256 ${contentHash}. Bypassing Gemini AI!`
+            );
+            pattern = {
+              title: cachedTut.title,
+              language: cachedTut.raw_content_language,
+              project_type: cachedTut.project_type,
+              level: cachedTut.level,
+              hook_size: cachedTut.stitch,
+              materials: cachedTut.materials || [],
+              gauge: cachedTut.gauge,
+              summary: cachedTut.note,
+              sections: Array.from(new Set(cachedSteps.map((s: any) => s.section))),
+              steps: cachedSteps,
+            };
+            isCacheHit = true;
+          }
+        }
+      }
+    } catch (cacheLookupErr) {
+      console.warn('[API /api/parse-pattern] Cache lookup skipped, proceeding with Gemini AI:', cacheLookupErr);
+    }
+
+    // 7. Call Gemini Multimodal AI extraction only on cache miss
+    if (!pattern) {
+      console.log(`[API /api/parse-pattern] 🤖 Cache miss. Triggering Gemini AI extraction pipeline...`);
+      const aiResult = await parsePatternWithGemini({
+        files: aiFiles.length > 0 ? aiFiles : undefined,
+        rawText: rawText.trim() || undefined,
+        userHint: userNote.trim() || undefined,
+      });
+
+      pattern = aiResult.pattern;
+
+      // Record Token Usage only on actual Gemini API calls
+      await recordAiTokenUsage({
+        userId: user.id,
+        action: 'parse_pattern',
+        inputTokens: aiResult.usage.inputTokens,
+        outputTokens: aiResult.usage.outputTokens,
+        totalTokens: aiResult.usage.totalTokens,
+        modelUsed: aiResult.usage.modelUsed,
+      });
+
+      // Save permanently into pattern_cache for all future uploads
+      try {
+        const adminClient = await createAdminClient();
+        await (adminClient.from('pattern_cache') as any).upsert(
+          {
+            content_hash: contentHash,
+            title: pattern.title || primaryFileName || 'Mon patron de crochet',
+            language: pattern.language || null,
+            project_type: pattern.project_type || null,
+            level: pattern.level || null,
+            stitch: pattern.hook_size || null,
+            materials: pattern.materials || [],
+            gauge: pattern.gauge || null,
+            summary: pattern.summary || null,
+            sections: pattern.sections || [],
+            steps: pattern.steps || [],
+          },
+          { onConflict: 'content_hash' }
+        );
+      } catch (cacheSaveErr) {
+        console.warn('[API /api/parse-pattern] Non-blocking cache save error:', cacheSaveErr);
+      }
+    }
+
     const finalTitle = userTitle.trim() || pattern.title || primaryFileName || 'Mon patron de crochet';
 
-    // 6. Record Token Usage
-    await recordAiTokenUsage({
-      userId: user.id,
-      action: 'parse_pattern',
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-      totalTokens: usage.totalTokens,
-      modelUsed: usage.modelUsed,
-    });
-
     // 7. Insert Tutorial into Database
-    console.log(`[API /api/parse-pattern] 💾 Saving tutorial "${finalTitle}" to database...`);
+    console.log(`[API /api/parse-pattern] 💾 Saving tutorial "${finalTitle}" to database (cached=${isCacheHit})...`);
     const { data: tutorial, error: tutorialError } = await (supabase.from('tutorials') as any)
       .insert({
         id: tutorialId,
@@ -166,11 +297,11 @@ export async function POST(request: NextRequest) {
         file_name: primaryFileName,
         file_type: primaryFileType,
         note: userNote || pattern.summary || null,
-        raw_content: rawText || null,
-        raw_content_language: pattern.language || 'en_us',
+        raw_content: `hash:${contentHash}`,
+        raw_content_language: pattern.language || null,
         stitch: pattern.hook_size || null,
-        level: pattern.level || 'intermediaire',
-        project_type: pattern.project_type || 'amigurumi',
+        level: pattern.level || null,
+        project_type: pattern.project_type || null,
         materials: pattern.materials || [],
         gauge: pattern.gauge || null,
       })
@@ -188,7 +319,7 @@ export async function POST(request: NextRequest) {
         `[API /api/parse-pattern] 📋 Inserting ${pattern.steps.length} checklist steps into database...`
       );
 
-      const itemsToInsert = pattern.steps.map((step, idx) => ({
+      const itemsToInsert = pattern.steps.map((step: any, idx: number) => ({
         tutorial_id: tutorial.id,
         label: step.label,
         section: step.section || 'General',
@@ -202,7 +333,6 @@ export async function POST(request: NextRequest) {
 
       if (itemsError) {
         console.error(`[API /api/parse-pattern] ❌ Error inserting checklist items:`, itemsError);
-        // Tutorial is saved, so we return with warning
       } else {
         console.log(`[API /api/parse-pattern] ✅ Checklist items inserted successfully.`);
       }
@@ -210,7 +340,7 @@ export async function POST(request: NextRequest) {
 
     const totalDuration = Date.now() - requestStartTime;
     console.log(
-      `[API /api/parse-pattern] 🎉 Pattern ingestion completed successfully in ${totalDuration}ms. Tutorial ID: ${tutorial.id}`
+      `[API /api/parse-pattern] 🎉 Pattern ingestion completed in ${totalDuration}ms (cacheHit=${isCacheHit}). Tutorial ID: ${tutorial.id}`
     );
 
     return NextResponse.json({
@@ -219,6 +349,7 @@ export async function POST(request: NextRequest) {
       title: tutorial.title,
       stepsCount: pattern.steps?.length || 0,
       sectionsCount: pattern.sections?.length || 0,
+      cached: isCacheHit,
     });
   } catch (error: any) {
     const totalDuration = Date.now() - requestStartTime;

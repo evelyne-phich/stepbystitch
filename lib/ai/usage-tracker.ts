@@ -28,30 +28,38 @@ export async function checkUserUploadQuota(userId: string): Promise<QuotaCheckRe
   console.log(`[Usage Tracker] 🔍 Checking upload quota for user ${userId}...`);
 
   try {
-    const { count, error } = await (supabase.from('tutorials') as any)
+    // 1. Check lifetime parse attempts from ai_usage to prevent delete & re-upload abuse
+    const { count: usageCount, error: usageError } = await (supabase.from('ai_usage') as any)
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('action', 'parse_pattern');
+
+    // 2. Also check current active tutorials in library
+    const { count: tutorialCount, error: tutorialError } = await (supabase.from('tutorials') as any)
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId);
 
-    if (error) {
-      console.error(`[Usage Tracker] ❌ Error querying tutorial count for user ${userId}:`, error);
-      throw error;
+    if (usageError && tutorialError) {
+      console.error(`[Usage Tracker] ❌ Error querying quota for user ${userId}:`, usageError || tutorialError);
+      throw usageError || tutorialError;
     }
 
-    const currentCount = count || 0;
+    // Lifetime attempts cannot be reset by deleting a project
+    const lifetimeCount = Math.max(usageCount || 0, tutorialCount || 0);
     
-    // Future: check user subscription tier from profiles / stripe table
-    // For now, default users are Free tier unless specified
-    const isUnlimited = false;
+    // In local development, enable unlimited uploads unless SIMULATE_FREE_TIER is explicitly enabled
+    const isDev = process.env.NODE_ENV === 'development';
+    const isUnlimited = isDev && process.env.SIMULATE_FREE_TIER !== 'true';
     const maxAllowed = isUnlimited ? null : FREE_TIER_MAX_PATTERNS;
-    const canUpload = isUnlimited || currentCount < FREE_TIER_MAX_PATTERNS;
+    const canUpload = isUnlimited || lifetimeCount < FREE_TIER_MAX_PATTERNS;
 
     console.log(
-      `[Usage Tracker] 📊 User ${userId} has ${currentCount}/${maxAllowed ?? '∞'} patterns | Allowed: ${canUpload}`
+      `[Usage Tracker] 📊 User ${userId} has ${lifetimeCount}/${maxAllowed ?? '∞ (dev)'} lifetime pattern parses | Allowed: ${canUpload}`
     );
 
     return {
       canUpload,
-      currentCount,
+      currentCount: lifetimeCount,
       maxAllowed,
       isUnlimited,
     };

@@ -16,8 +16,10 @@ import {
   Lock,
   ArrowRight,
   Loader2,
+  Clock,
 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/context';
+import { Toast } from '@/components/ui/toast';
 
 interface FilePreview {
   file: File;
@@ -27,6 +29,9 @@ interface FilePreview {
 export function UploadDropzone() {
   const { t } = useI18n();
   const router = useRouter();
+
+  // Ref for auto-scrolling to submit/progress area
+  const submitSectionRef = useRef<HTMLDivElement>(null);
 
   // Mode: 'file' or 'text'
   const [activeTab, setActiveTab] = useState<'file' | 'text'>('file');
@@ -47,6 +52,10 @@ export function UploadDropzone() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [toastNotification, setToastNotification] = useState<{
+    message: string;
+    type: 'error' | 'info' | 'success';
+  } | null>(null);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
 
   // Drag & drop handlers
@@ -141,6 +150,11 @@ export function UploadDropzone() {
     setIsSubmitting(true);
     setCurrentStepIndex(0);
 
+    // Auto-scroll smoothly to ensure loading progress is in full view
+    setTimeout(() => {
+      submitSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+
     // Simulated progress steps for smooth UX
     const stepTimer1 = setTimeout(() => setCurrentStepIndex(1), 1500);
     const stepTimer2 = setTimeout(() => setCurrentStepIndex(2), 5000);
@@ -170,6 +184,14 @@ export function UploadDropzone() {
 
       const data = await response.json();
 
+      if (response.status === 401) {
+        setErrorMessage(t.upload.errorUnauthorized);
+        setIsSubmitting(false);
+        clearTimeout(stepTimer1);
+        clearTimeout(stepTimer2);
+        return;
+      }
+
       if (response.status === 403 && data.error === 'QUOTA_EXCEEDED') {
         setQuotaExceeded(true);
         setIsSubmitting(false);
@@ -185,6 +207,17 @@ export function UploadDropzone() {
       // Clean up previews
       clearAllFiles();
       
+      if (data.alreadyExists) {
+        setToastNotification({
+          message: t.upload.alreadyExistsToast,
+          type: 'info',
+        });
+        setTimeout(() => {
+          router.push(`/library/${data.tutorialId}`);
+        }, 1200);
+        return;
+      }
+
       // Navigate to newly created interactive pattern project
       router.push(`/library/${data.tutorialId}`);
     } catch (err: any) {
@@ -197,7 +230,16 @@ export function UploadDropzone() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      
+      {/* Floating Dynamic Toast (Error, Info, Success) */}
+      <Toast
+        message={toastNotification?.message || errorMessage}
+        type={toastNotification?.type || 'error'}
+        onClose={() => {
+          setErrorMessage(null);
+          setToastNotification(null);
+        }}
+      />
+
       {/* Quota Exceeded Banner */}
       {quotaExceeded && (
         <div className="mb-8 p-6 rounded-3xl bg-sage-50 border border-sage-200 shadow-soft animate-fadeIn">
@@ -435,13 +477,75 @@ export function UploadDropzone() {
         </div>
 
         {/* SUBMIT BUTTON & PROGRESS */}
-        <div className="space-y-4">
+        <div className="space-y-4 pt-2" ref={submitSectionRef}>
+          {/* Animated step progression while submitting (Placed ABOVE button so it is immediately visible without scrolling) */}
+          {isSubmitting && (
+            <div className="p-6 rounded-3xl bg-sage-50/90 border border-sage-200 text-yarn-800 space-y-3.5 shadow-soft animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-3 text-xs font-semibold">
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    currentStepIndex > 0
+                      ? 'bg-emerald-600 text-white'
+                      : currentStepIndex === 0
+                      ? 'bg-sage-700 text-white animate-pulse'
+                      : 'bg-yarn-300 text-yarn-700'
+                  }`}
+                >
+                  {currentStepIndex > 0 ? <CheckCircle2 className="w-4 h-4" /> : '1'}
+                </div>
+                <span className={currentStepIndex === 0 ? 'font-bold text-yarn-950 text-sm' : 'text-yarn-600'}>
+                  {t.upload.step1}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 text-xs font-semibold">
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    currentStepIndex > 1
+                      ? 'bg-emerald-600 text-white'
+                      : currentStepIndex === 1
+                      ? 'bg-sage-700 text-white animate-pulse'
+                      : 'bg-yarn-300 text-yarn-700'
+                  }`}
+                >
+                  {currentStepIndex > 1 ? <CheckCircle2 className="w-4 h-4" /> : '2'}
+                </div>
+                <span className={currentStepIndex === 1 ? 'font-bold text-yarn-950 text-sm' : 'text-yarn-600'}>
+                  {t.upload.step2}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 text-xs font-semibold">
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    currentStepIndex >= 2
+                      ? 'bg-sage-700 text-white animate-spin'
+                      : 'bg-yarn-300 text-yarn-700'
+                  }`}
+                >
+                  {currentStepIndex >= 2 ? <Loader2 className="w-3.5 h-3.5" /> : '3'}
+                </div>
+                <span className={currentStepIndex >= 2 ? 'font-bold text-yarn-950 text-sm' : 'text-yarn-600'}>
+                  {t.upload.step3}
+                </span>
+              </div>
+
+              {/* Patience / Loading Notice */}
+              <div className="pt-3 border-t border-sage-200/80 flex items-start gap-2.5 text-xs text-sage-900 bg-sage-100/70 p-3 rounded-2xl">
+                <Clock className="w-4 h-4 text-sage-700 shrink-0 mt-0.5" />
+                <p className="leading-relaxed font-normal">
+                  {t.upload.patientNotice}
+                </p>
+              </div>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={isSubmitting}
             className={`w-full py-4 px-6 rounded-2xl text-base font-bold text-white shadow-lift flex items-center justify-center gap-2 transition-all transform ${
               isSubmitting
-                ? 'bg-yarn-400 cursor-not-allowed'
+                ? 'bg-yarn-400 cursor-not-allowed opacity-90'
                 : 'bg-gradient-to-r from-sage-800 via-sage-700 to-sage-600 hover:from-sage-900 hover:to-sage-700 hover:-translate-y-0.5 shadow-soft hover:shadow-lift'
             }`}
           >
@@ -457,50 +561,6 @@ export function UploadDropzone() {
               </>
             )}
           </button>
-
-          {/* Animated step progression while submitting */}
-          {isSubmitting && (
-            <div className="p-6 rounded-3xl bg-yarn-100 border border-yarn-200 text-yarn-800 space-y-3 animate-fadeIn">
-              <div className="flex items-center gap-3 text-xs font-semibold">
-                <div
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                    currentStepIndex >= 0 ? 'bg-sage-600 text-white' : 'bg-yarn-300 text-yarn-700'
-                  }`}
-                >
-                  {currentStepIndex > 0 ? <CheckCircle2 className="w-3.5 h-3.5" /> : '1'}
-                </div>
-                <span className={currentStepIndex === 0 ? 'font-bold text-yarn-950' : 'text-yarn-600'}>
-                  {t.upload.step1}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3 text-xs font-semibold">
-                <div
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                    currentStepIndex >= 1 ? 'bg-sage-600 text-white' : 'bg-yarn-300 text-yarn-700'
-                  }`}
-                >
-                  {currentStepIndex > 1 ? <CheckCircle2 className="w-3.5 h-3.5" /> : '2'}
-                </div>
-                <span className={currentStepIndex === 1 ? 'font-bold text-yarn-950' : 'text-yarn-600'}>
-                  {t.upload.step2}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3 text-xs font-semibold">
-                <div
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                    currentStepIndex >= 2 ? 'bg-sage-600 text-white' : 'bg-yarn-300 text-yarn-700'
-                  }`}
-                >
-                  {currentStepIndex >= 2 ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : '3'}
-                </div>
-                <span className={currentStepIndex === 2 ? 'font-bold text-yarn-950' : 'text-yarn-600'}>
-                  {t.upload.step3}
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
       </form>

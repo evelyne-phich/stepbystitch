@@ -25,8 +25,8 @@ export interface ParsePatternResult {
   };
 }
 
-const FALLBACK_MODEL = 'gemini-2.5-flash';
-const PRIMARY_MODEL = process.env.GEMINI_MODEL || FALLBACK_MODEL;
+const DEFAULT_MODELS = ['gemini-3.6-flash', 'gemini-2.0-flash'];
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || DEFAULT_MODELS[0];
 
 /**
  * Initializes GoogleGenAI client
@@ -75,12 +75,16 @@ export async function parsePatternWithGemini(
 
   parts.push({ text: textPrompt });
 
-  // 3. Try primary model first, fallback to gemini-2.5-flash if needed
-  const modelsToTry = PRIMARY_MODEL !== FALLBACK_MODEL ? [PRIMARY_MODEL, FALLBACK_MODEL] : [PRIMARY_MODEL];
+  // 3. Try models in resilient sequence
+  const modelsToTry = [
+    PRIMARY_MODEL,
+    ...DEFAULT_MODELS.filter((m) => m !== PRIMARY_MODEL),
+  ];
 
   let lastError: any = null;
 
-  for (const model of modelsToTry) {
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const model = modelsToTry[i];
     try {
       console.log(`[AI Parser] 🧶 Executing crochet pattern extraction with model "${model}"...`);
 
@@ -130,8 +134,8 @@ export async function parsePatternWithGemini(
     } catch (error: any) {
       lastError = error;
       console.warn(`[AI Parser] ⚠️ Failed with model "${model}": ${error.message || error}`);
-      if (model !== modelsToTry[modelsToTry.length - 1]) {
-        console.log(`[AI Parser] 🔄 Retrying with fallback model "${FALLBACK_MODEL}"...`);
+      if (i < modelsToTry.length - 1) {
+        console.log(`[AI Parser] 🔄 Retrying with fallback model "${modelsToTry[i + 1]}"...`);
       }
     }
   }

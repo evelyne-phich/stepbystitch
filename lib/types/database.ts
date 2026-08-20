@@ -95,6 +95,21 @@ export interface AiUsage {
   created_at: string;
 }
 
+export interface PatternCache {
+  content_hash: string;
+  title: string;
+  language?: string | null;
+  project_type?: string | null;
+  level?: string | null;
+  stitch?: string | null;
+  materials?: TutorialMaterial[] | Json | null;
+  gauge?: string | null;
+  summary?: string | null;
+  sections: string[] | Json;
+  steps: Json;
+  created_at: string;
+}
+
 export type Database = {
   public: {
     Tables: {
