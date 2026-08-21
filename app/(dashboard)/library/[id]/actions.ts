@@ -288,6 +288,7 @@ export async function getOrTranslatePatternAction(
     const result = await translateCrochetPatternWithGemini({
       tutorialId,
       title: tutorial.title,
+      note: tutorial.note,
       sourceLanguage: tutorial.raw_content_language || 'auto',
       targetLanguage: targetLanguage as any,
       materials: tutorial.materials || [],

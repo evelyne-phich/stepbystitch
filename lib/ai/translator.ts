@@ -38,6 +38,7 @@ export interface TranslatedStep {
 
 export interface TranslatedPatternContent {
   title: string;
+  note?: string | null;
   target_language: TranslationLanguage;
   materials?: TutorialMaterial[];
   sections: string[];
@@ -47,6 +48,7 @@ export interface TranslatedPatternContent {
 export interface TranslatePatternInput {
   tutorialId: string;
   title: string;
+  note?: string | null;
   sourceLanguage?: string;
   targetLanguage: TranslationLanguage;
   materials?: TutorialMaterial[];
@@ -206,8 +208,12 @@ CRITICAL UX & TECHNICAL RULES:
    - "Jambe 1" ➔ "Leg 1" / "Pierna 1" / "Bein 1"
    - "Jambe 2" ➔ "Leg 2" / "Pierna 2" / "Bein 2"
    - "Assemblage & Finitions" ➔ "Assembly & Finishing" / "Montaje" / "Zusammennähen"
+ 
+ 6. **TRANSLATE OVERALL PATTERN DESCRIPTION / NOTES (\`note\`)**:
+    - If the pattern payload contains an overall description or introductory note (\`note\`), translate it completely and naturally into the target language.
+    - If no note is present in the source, return null.
 
-6. Return structured JSON matching the provided schema.`;
+ 7. Return structured JSON matching the provided schema.`;
 
 const CROCHET_TRANSLATION_JSON_SCHEMA = {
   type: 'object',
@@ -215,6 +221,10 @@ const CROCHET_TRANSLATION_JSON_SCHEMA = {
     title: {
       type: 'string',
       description: 'Translated title of the pattern.',
+    },
+    note: {
+      type: 'string',
+      description: 'Translated overall description, introductory notes, or project information.',
     },
     materials: {
       type: 'array',
@@ -293,6 +303,7 @@ export async function translateCrochetPatternWithGemini(
 
   const payloadToTranslate = {
     title: input.title,
+    note: input.note || null,
     sourceLanguage: input.sourceLanguage || 'auto',
     targetLanguage: input.targetLanguage,
     targetLanguageDescription: targetLangLabel,
@@ -379,9 +390,23 @@ export async function translateCrochetPatternWithGemini(
         };
       });
 
+      let translatedOverallNote: string | null = null;
+      if (typeof parsedJson.note === 'string') {
+        const trimmed = parsedJson.note.trim();
+        if (
+          trimmed !== '' &&
+          trimmed.toLowerCase() !== 'null' &&
+          trimmed.toLowerCase() !== 'undefined' &&
+          trimmed !== 'DEFAULT_NOTE'
+        ) {
+          translatedOverallNote = trimmed;
+        }
+      }
+
       return {
         content: {
           title: parsedJson.title || input.title,
+          note: translatedOverallNote,
           target_language: input.targetLanguage,
           materials: parsedJson.materials || input.materials,
           sections: parsedJson.sections || input.sections,

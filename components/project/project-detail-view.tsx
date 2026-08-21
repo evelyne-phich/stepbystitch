@@ -1067,8 +1067,11 @@ export function ProjectDetailView({
     ? activeTranslation.materials
     : rawMaterialsList;
 
-  // Active translated title (if translating)
+  // Active translated title and note (if translating)
   const displayTitle = activeTranslation?.title || projectTitle;
+  const displayNote = (activeTranslation?.note !== undefined && activeTranslation?.note !== null)
+    ? activeTranslation.note
+    : projectNote;
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-8 pb-16 transition-all duration-300">
@@ -1302,7 +1305,7 @@ export function ProjectDetailView({
         </div>
 
         {/* Description & Notes (integrated in progress card, automatically collapses when scrolling) */}
-        {projectNote && (
+        {displayNote && (
           <div
             className={`transition-all duration-300 ease-out overflow-hidden ${
               isScrolled
@@ -1311,7 +1314,7 @@ export function ProjectDetailView({
             }`}
           >
             <p className="text-xs sm:text-sm text-yarn-700 leading-relaxed whitespace-pre-wrap">
-              {projectNote}
+              {displayNote}
             </p>
           </div>
         )}
@@ -1363,7 +1366,7 @@ export function ProjectDetailView({
                         </h2>
                         {isMaterialsDone && isMaterialsCollapsed && (
                           <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 animate-in fade-in shrink-0">
-                            Prêt ✓
+                            {t.project.materialsReadyBadge || 'Prêt ✓'}
                           </span>
                         )}
                         {!isMaterialsDone && isMaterialsCollapsed && materialsList.length > 0 && (
@@ -1374,7 +1377,8 @@ export function ProjectDetailView({
                       </div>
                       {materialsList.length > 0 && !isMaterialsCollapsed && (
                         <p className="text-[11px] font-medium text-yarn-500">
-                          {checkedMaterials.size} / {materialsList.length} prêtes
+                          {checkedMaterials.size} / {materialsList.length}{' '}
+                          {t.project.materialsReadyPlural || 'prêts'}
                         </p>
                       )}
                     </div>
@@ -1499,7 +1503,7 @@ export function ProjectDetailView({
                             </span>
                             {isGroupDone && isCollapsed && (
                               <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 animate-in fade-in shrink-0">
-                                Terminé ✓
+                                {t.project.sectionCompletedBadge || 'Terminé ✓'}
                               </span>
                             )}
                           </div>
@@ -1789,7 +1793,7 @@ export function ProjectDetailView({
                             </h2>
                             {isDone && isCollapsed && (
                               <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 animate-in fade-in shrink-0">
-                                Terminé ✓
+                                {t.project.sectionCompletedBadge || 'Terminé ✓'}
                               </span>
                             )}
                           </div>
