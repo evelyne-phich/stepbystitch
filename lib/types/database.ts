@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type SourceType = 'pdf' | 'image' | 'manuscrit' | 'text';
+export type SourceType = 'pdf' | 'image' | 'text';
 export type TranslationStatus = 'pending' | 'processing' | 'done' | 'failed';
 
 export interface AppSetting {
@@ -51,6 +51,13 @@ export interface Tutorial {
   gauge?: string | null;
   saved_at: string;
   updated_at: string;
+}
+
+export interface TutorialWithProgress extends Tutorial {
+  totalSteps?: number;
+  completedSteps?: number;
+  progressPercent?: number;
+  isCompleted?: boolean;
 }
 
 export interface ChecklistItem {

@@ -1,13 +1,13 @@
 # 🧶 StepByStitch
 
 > **The smart crochet pattern reader and personal library.**  
-> Transform PDF patterns and screenshots into interactive checklists, track your progress round-by-round, add custom notes, and translate crochet abbreviations (US / UK / FR) on demand.
+> Transform PDF patterns and images into interactive checklists, track your progress round-by-round, add custom notes, and translate crochet abbreviations (US / UK / FR) on demand.
 
 ---
 
 ## ✨ Features
 
-- **📄 Smart Pattern Import**: Upload multi-page PDFs or image screenshots (JPEG, PNG, WebP) directly to your secure private library.
+- **📄 Smart Pattern Import**: Upload multi-page PDFs or images (JPEG, PNG, WebP) directly to your secure private library.
 - **✅ Interactive Checklists**: Break down complex patterns into clear, checkable rounds and rows with live progress tracking and celebratory confetti.
 - **🌐 Specialized Crochet Translation**: Convert technical crochet terms and stitch abbreviations seamlessly between US, UK, and French (e.g., `sc`, `dc`, `inc`, `dec` ↔ `ms`, `br`, `aug`, `dim`).
 - **📝 Notes & Customization**: Edit pattern instructions, fix designer typos, and add custom notes to any individual row (hook size used, tension reminders, yarn colorways).

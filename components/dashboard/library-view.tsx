@@ -2,18 +2,21 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search, BookOpen, FileText, Image as ImageIcon, AlignLeft } from 'lucide-react';
+import { Plus, Search, BookOpen, FileText, Image as ImageIcon, AlignLeft, CheckCircle2, Sparkles } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/context';
-import type { Tutorial } from '@/lib/types/database';
+import type { TutorialWithProgress } from '@/lib/types/database';
 
 interface LibraryViewProps {
-  initialTutorials: Tutorial[];
+  initialTutorials: TutorialWithProgress[];
 }
 
 export function LibraryView({ initialTutorials }: LibraryViewProps) {
   const { t, locale } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'in_progress' | 'completed'>('all');
+
+  const inProgressCount = initialTutorials.filter((t) => !t.isCompleted).length;
+  const completedCount = initialTutorials.filter((t) => !!t.isCompleted).length;
 
   const filteredTutorials = initialTutorials.filter((tutorial) => {
     const matchesSearch = tutorial.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -22,10 +25,10 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
     if (!matchesSearch) return false;
 
     if (filterStatus === 'in_progress') {
-      return !tutorial.note?.includes('[COMPLETED]');
+      return !tutorial.isCompleted;
     }
     if (filterStatus === 'completed') {
-      return tutorial.note?.includes('[COMPLETED]');
+      return !!tutorial.isCompleted;
     }
     return true;
   });
@@ -83,24 +86,24 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
           <button
             type="button"
             onClick={() => setFilterStatus('in_progress')}
-            className={`px-4 py-2 rounded-xl text-xs font-medium border transition-colors whitespace-nowrap ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors whitespace-nowrap ${
               filterStatus === 'in_progress'
                 ? 'bg-yarn-900 text-white border-yarn-900'
-                : 'bg-white text-yarn-700 border-yarn-200 hover:bg-yarn-100'
+                : 'bg-white text-yarn-700 border border-yarn-200 hover:bg-yarn-100'
             }`}
           >
-            {t.library.filterInProgress}
+            {t.library.filterInProgress} ({inProgressCount})
           </button>
           <button
             type="button"
             onClick={() => setFilterStatus('completed')}
-            className={`px-4 py-2 rounded-xl text-xs font-medium border transition-colors whitespace-nowrap ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors whitespace-nowrap ${
               filterStatus === 'completed'
-                ? 'bg-yarn-900 text-white border-yarn-900'
-                : 'bg-white text-yarn-700 border-yarn-200 hover:bg-yarn-100'
+                ? 'bg-emerald-800 text-white border-emerald-800'
+                : 'bg-white text-yarn-700 border border-yarn-200 hover:bg-yarn-100'
             }`}
           >
-            {t.library.filterCompleted}
+            {t.library.filterCompleted} ({completedCount})
           </button>
         </div>
       </div>
@@ -131,47 +134,98 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTutorials.map((tutorial) => (
-            <Link
-              key={tutorial.id}
-              href={`/library/${tutorial.id}`}
-              className="group bg-white rounded-3xl p-6 border border-yarn-200 hover:border-yarn-400 shadow-soft hover:shadow-lift transition-all flex flex-col justify-between"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold uppercase bg-yarn-100 text-yarn-700">
-                    {tutorial.source_type === 'pdf' && <FileText className="w-3 h-3 text-sage-600" />}
-                    {tutorial.source_type === 'image' && <ImageIcon className="w-3 h-3 text-sage-600" />}
-                    {tutorial.source_type === 'text' && <AlignLeft className="w-3 h-3 text-sage-600" />}
-                    {tutorial.source_type === 'manuscrit' && <FileText className="w-3 h-3 text-sage-600" />}
-                    <span>{tutorial.source_type.toUpperCase()}</span>
-                  </span>
-                  <span className="text-[11px] text-yarn-400 font-mono">
-                    {new Date(tutorial.saved_at).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US')}
-                  </span>
+          {filteredTutorials.map((tutorial) => {
+            const isCompleted = tutorial.isCompleted;
+            const progress = tutorial.progressPercent || 0;
+
+            return (
+              <Link
+                key={tutorial.id}
+                href={`/library/${tutorial.id}`}
+                className={`group bg-white rounded-3xl p-6 border shadow-soft hover:shadow-lift transition-all flex flex-col justify-between ${
+                  isCompleted
+                    ? 'border-emerald-200/90 hover:border-emerald-400 ring-1 ring-emerald-500/10'
+                    : 'border-yarn-200 hover:border-yarn-400'
+                }`}
+              >
+                <div className="space-y-4">
+                  {/* Card Header Badges */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold uppercase bg-yarn-100 text-yarn-700">
+                        {tutorial.source_type === 'pdf' && <FileText className="w-3 h-3 text-sage-600" />}
+                        {tutorial.source_type === 'image' && <ImageIcon className="w-3 h-3 text-sage-600" />}
+                        {tutorial.source_type === 'text' && <AlignLeft className="w-3 h-3 text-sage-600" />}
+                        <span>{((t.library.sourceTypes as any)?.[tutorial.source_type] || tutorial.source_type).toUpperCase()}</span>
+                      </span>
+
+                      {/* 100% Finished / Completed Badge */}
+                      {isCompleted && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 shadow-2xs animate-in fade-in">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>{t.library.statusCompleted}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <span className="text-[11px] text-yarn-400 font-mono shrink-0">
+                      {new Date(tutorial.saved_at).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US')}
+                    </span>
+                  </div>
+
+                  {/* Title & Note */}
+                  <div className="space-y-1.5">
+                    <h2 className="text-lg font-bold font-serif text-yarn-900 group-hover:text-yarn-700 transition-colors line-clamp-2">
+                      {tutorial.title}
+                    </h2>
+
+                    {tutorial.note && (
+                      <p className="text-xs text-yarn-600 line-clamp-2 leading-relaxed">
+                        {tutorial.note}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Interactive Progress Track */}
+                  {tutorial.totalSteps !== undefined && tutorial.totalSteps > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between text-[11px] font-medium text-yarn-500">
+                        <span>
+                          {tutorial.completedSteps || 0} / {tutorial.totalSteps} {t.library.stepsCompletedLabel}
+                        </span>
+                        <span className={`font-bold font-mono ${isCompleted ? 'text-emerald-700' : 'text-yarn-700'}`}>
+                          {progress}%
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-yarn-100 overflow-hidden border border-yarn-200/50 p-px">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            isCompleted
+                              ? 'bg-gradient-to-r from-emerald-600 to-teal-400'
+                              : progress > 0
+                              ? 'bg-gradient-to-r from-sage-800 to-sage-600'
+                              : 'bg-yarn-200'
+                          }`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <h2 className="text-lg font-bold font-serif text-yarn-900 group-hover:text-yarn-700 transition-colors line-clamp-2">
-                  {tutorial.title}
-                </h2>
-
-                {tutorial.note && (
-                  <p className="text-xs text-yarn-600 line-clamp-2">
-                    {tutorial.note}
-                  </p>
-                )}
-              </div>
-
-              <div className="pt-4 mt-4 border-t border-yarn-100 flex items-center justify-between text-xs text-yarn-500">
-                <span className="capitalize">
-                  {tutorial.level ? ((t.project.levels as any)?.[tutorial.level.toLowerCase()] || tutorial.level) : t.library.allLevels}
-                </span>
-                <span className="font-semibold text-sage-700 group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-                  {t.library.openPattern}
-                </span>
-              </div>
-            </Link>
-          ))}
+                <div className="pt-4 mt-4 border-t border-yarn-100 flex items-center justify-between text-xs text-yarn-500">
+                  <span className="capitalize font-medium">
+                    {tutorial.level ? ((t.project.levels as any)?.[tutorial.level.toLowerCase()] || tutorial.level) : t.library.allLevels}
+                  </span>
+                  <span className={`font-semibold transition-transform group-hover:translate-x-1 inline-flex items-center gap-1 ${
+                    isCompleted ? 'text-emerald-700' : 'text-sage-700'
+                  }`}>
+                    {t.library.openPattern}
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
 

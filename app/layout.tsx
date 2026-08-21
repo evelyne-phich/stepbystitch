@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     default: 'Step by Stitch - Crochet Pattern Reader, Interactive Checklist & Translator',
     template: '%s | Step by Stitch',
   },
-  description: 'Transform your crochet PDF patterns and screenshots into interactive, editable, and translatable checklists (US / UK / FR). Keep all your patterns privately accessible anywhere.',
+  description: 'Transform your crochet PDF patterns and images into interactive, editable, and translatable checklists (US / UK / FR). Keep all your patterns privately accessible anywhere.',
   keywords: [
     'crochet pattern reader',
     'crochet pattern pdf',

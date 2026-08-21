@@ -179,18 +179,50 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Feed trimmed text into SHA-256 hasher
-      sha256Hasher.update(rawText.trim());
+      const trimmedText = rawText.trim();
+      sha256Hasher.update(trimmedText);
+
+      // Upload raw text as .txt file into Supabase Private Storage `tutorial_files`
+      const storagePath = `${user.id}/${tutorialId}/original_pattern.txt`;
+      primaryFilePath = storagePath;
+      primaryFileName = 'patron_original.txt';
+      primaryFileType = 'text/plain';
+
+      const textBuffer = Buffer.from(trimmedText, 'utf-8');
+      console.log(
+        `[API /api/parse-pattern] ☁️ Uploading raw text (${trimmedText.length} chars) to storage bucket "tutorial_files" at path "${storagePath}"...`
+      );
+
+      const { error: uploadError } = await supabase.storage
+        .from('tutorial_files')
+        .upload(storagePath, textBuffer, {
+          contentType: 'text/plain; charset=utf-8',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.warn(`[API /api/parse-pattern] Storage upload notice for raw text:`, uploadError);
+      } else {
+        console.log(`[API /api/parse-pattern] ✅ Raw text uploaded successfully to private storage.`);
+      }
     }
 
     const contentHash = sha256Hasher.digest('hex');
     console.log(`[API /api/parse-pattern] 🔑 SHA-256 hash computed: ${contentHash}`);
 
     // 5. Check if this exact pattern is ALREADY in the current user's library
-    const { data: userExistingTutorial } = await (supabase.from('tutorials') as any)
+    const trimmedRawText = rawText ? rawText.trim() : null;
+    let existingQuery = (supabase.from('tutorials') as any)
       .select('id, title')
-      .eq('user_id', user.id)
-      .eq('raw_content', `hash:${contentHash}`)
-      .limit(1);
+      .eq('user_id', user.id);
+
+    if (trimmedRawText) {
+      existingQuery = existingQuery.or(`raw_content.eq.hash:${contentHash},raw_content.eq."${trimmedRawText.replace(/"/g, '""')}"`);
+    } else {
+      existingQuery = existingQuery.eq('raw_content', `hash:${contentHash}`);
+    }
+
+    const { data: userExistingTutorial } = await existingQuery.limit(1);
 
     if (userExistingTutorial && userExistingTutorial.length > 0) {
       console.log(
@@ -239,10 +271,16 @@ export async function POST(request: NextRequest) {
 
       // Step 6B: Fallback check in tutorials table
       if (!pattern) {
-        const { data: cachedTutorials, error: cacheErr } = await (adminClient.from('tutorials') as any)
-          .select('id, title, stitch, level, project_type, materials, gauge, raw_content_language, note')
-          .eq('raw_content', `hash:${contentHash}`)
-          .limit(1);
+        let cachedTutQuery = (adminClient.from('tutorials') as any)
+          .select('id, title, stitch, level, project_type, materials, gauge, raw_content_language, note');
+
+        if (trimmedRawText) {
+          cachedTutQuery = cachedTutQuery.or(`raw_content.eq.hash:${contentHash},raw_content.eq."${trimmedRawText.replace(/"/g, '""')}"`);
+        } else {
+          cachedTutQuery = cachedTutQuery.eq('raw_content', `hash:${contentHash}`);
+        }
+
+        const { data: cachedTutorials, error: cacheErr } = await cachedTutQuery.limit(1);
 
         if (!cacheErr && cachedTutorials && cachedTutorials.length > 0) {
           const cachedTut = cachedTutorials[0] as any;
@@ -322,28 +360,42 @@ export async function POST(request: NextRequest) {
 
     const finalTitle = userTitle.trim() || pattern.title || primaryFileName || 'Mon patron de crochet';
 
-    // 7. Insert Tutorial into Database
+    // 7. Insert Tutorial into Database (with resilient source_type check fallback)
     console.log(`[API /api/parse-pattern] 💾 Saving tutorial "${finalTitle}" to database (cached=${isCacheHit})...`);
-    const { data: tutorial, error: tutorialError } = await (supabase.from('tutorials') as any)
-      .insert({
-        id: tutorialId,
-        user_id: user.id,
-        title: finalTitle,
-        source_type: primarySourceType,
-        file_path: primaryFilePath,
-        file_name: primaryFileName,
-        file_type: primaryFileType,
-        note: userNote || pattern.summary || null,
-        raw_content: `hash:${contentHash}`,
-        raw_content_language: pattern.language || null,
-        stitch: pattern.hook_size || null,
-        level: pattern.level || null,
-        project_type: pattern.project_type || null,
-        materials: pattern.materials || [],
-        gauge: pattern.gauge || null,
-      })
+    const tutorialPayload = {
+      id: tutorialId,
+      user_id: user.id,
+      title: finalTitle,
+      source_type: primarySourceType,
+      file_path: primaryFilePath,
+      file_name: primaryFileName,
+      file_type: primaryFileType,
+      note: userNote || pattern.summary || null,
+      raw_content: primarySourceType === 'text' ? rawText.trim() : `hash:${contentHash}`,
+      raw_content_language: pattern.language || null,
+      stitch: pattern.hook_size || null,
+      level: pattern.level || null,
+      project_type: pattern.project_type || null,
+      materials: pattern.materials || [],
+      gauge: pattern.gauge || null,
+    };
+
+    let { data: tutorial, error: tutorialError } = await (supabase.from('tutorials') as any)
+      .insert(tutorialPayload)
       .select()
       .single();
+
+    // If source_type check constraint failed (e.g. DB expects 'screenshot' instead of 'image'), retry with fallback
+    if (tutorialError && tutorialError.message?.includes('tutorials_source_type_check')) {
+      console.warn(`[API /api/parse-pattern] ⚠️ tutorials_source_type_check mismatch for "${primarySourceType}". Retrying with fallback...`);
+      const fallbackSourceType = primarySourceType === 'image' ? 'screenshot' : (primarySourceType === 'text' ? 'manuscrit' : 'pdf');
+      const fallbackResult = await (supabase.from('tutorials') as any)
+        .insert({ ...tutorialPayload, source_type: fallbackSourceType })
+        .select()
+        .single();
+      tutorial = fallbackResult.data;
+      tutorialError = fallbackResult.error;
+    }
 
     if (tutorialError || !tutorial) {
       console.error(`[API /api/parse-pattern] ❌ Error inserting tutorial:`, tutorialError);

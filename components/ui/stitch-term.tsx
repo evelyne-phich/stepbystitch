@@ -118,6 +118,12 @@ const STITCH_DEFINITIONS: Record<string, StitchDefinition> = {
     descEn: 'Intermediate height stitch providing softness and texture.',
     extraEn: '🇬🇧 UK equivalent: Half Treble Crochet (htr)',
   },
+  hdb: {
+    titleFr: 'Demi-bride (db)',
+    descFr: 'Point de hauteur intermédiaire (demi-bride). Abréviation standard : db.',
+    titleEn: 'Half Double Crochet (db / hdc)',
+    descEn: 'Intermediate height stitch (demi-bride). Standard abbreviation: db.',
+  },
   hdc: {
     titleFr: 'Demi-bride (hdc)',
     descFr: 'Abréviation anglaise pour Half Double Crochet (demi-bride).',
