@@ -1,4 +1,4 @@
-# 🧶 StepByStitch
+# 🧶 Step by Stitch
 
 > **The smart crochet pattern reader and personal library.**  
 > Transform PDF patterns and images into interactive checklists, track your progress round-by-round, add custom notes, and translate crochet abbreviations (US / UK / FR) on demand.

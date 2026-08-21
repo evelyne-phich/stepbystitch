@@ -24,7 +24,7 @@ export interface ParsedCrochetPattern {
   steps: ParsedCrochetStep[];
 }
 
-export const CROCHET_PARSER_SYSTEM_INSTRUCTION = `You are a master crochet expert and pattern engineer AI for "StepByStitch".
+export const CROCHET_PARSER_SYSTEM_INSTRUCTION = `You are a master crochet expert and pattern engineer AI for "Step by Stitch".
 Your mission is to parse any crochet pattern (from PDF documents, image carousels, or raw pasted text) and convert it into a clean, structured, row-by-row interactive checklist.
 
 Key Rules:

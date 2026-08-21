@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { HowToTranslateView } from '@/components/guide/how-to-translate-view';
 
 export const metadata: Metadata = {
-  title: 'Comment Traduire un Patron de Crochet Anglais (US/UK) en Français | Guide StepByStitch',
+  title: 'Comment Traduire un Patron de Crochet Anglais (US/UK) en Français | Guide Step by Stitch',
   description: 'Guide pratique pour traduire facilement vos modèles et abréviations de crochet anglais (US/UK) vers le français. Convertissez vos termes en 1 clic.',
   alternates: {
     canonical: '/comment-traduire-patron-crochet',

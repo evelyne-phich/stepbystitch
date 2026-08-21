@@ -70,7 +70,7 @@ export interface TranslatePatternResult {
   };
 }
 
-const CROCHET_TRANSLATOR_SYSTEM_INSTRUCTION = `You are a master technical crochet translator for "StepByStitch".
+const CROCHET_TRANSLATOR_SYSTEM_INSTRUCTION = `You are a master technical crochet translator for "Step by Stitch".
 Your task is to accurately translate structured crochet patterns, steps, stitch abbreviations, sections, and materials into the target language.
 
 TECHNICAL CROCHET DICTIONARY & CONVERSIONS:
