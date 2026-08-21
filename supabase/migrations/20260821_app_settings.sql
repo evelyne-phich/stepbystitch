@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.app_settings (
 ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 
 -- Allow authenticated users and service role to read system settings
+DROP POLICY IF EXISTS "Allow public read access to app_settings" ON public.app_settings;
 CREATE POLICY "Allow public read access to app_settings"
   ON public.app_settings FOR SELECT
   USING (true);

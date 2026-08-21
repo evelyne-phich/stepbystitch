@@ -22,10 +22,12 @@ CREATE TABLE IF NOT EXISTS public.ai_usage (
 ALTER TABLE public.ai_usage ENABLE ROW LEVEL SECURITY;
 
 -- AI Usage RLS Policies
+DROP POLICY IF EXISTS "Users can view their own AI usage" ON public.ai_usage;
 CREATE POLICY "Users can view their own AI usage"
   ON public.ai_usage FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own AI usage" ON public.ai_usage;
 CREATE POLICY "Users can insert their own AI usage"
   ON public.ai_usage FOR INSERT
   WITH CHECK (auth.uid() = user_id);

@@ -18,14 +18,17 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- Profiles RLS Policies
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 CREATE POLICY "Users can view their own profile"
   ON public.profiles FOR SELECT
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
   ON public.profiles FOR UPDATE
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile"
   ON public.profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
@@ -74,18 +77,22 @@ CREATE TABLE IF NOT EXISTS public.tutorials (
 ALTER TABLE public.tutorials ENABLE ROW LEVEL SECURITY;
 
 -- Tutorials RLS Policies
+DROP POLICY IF EXISTS "Users can view only their own patterns" ON public.tutorials;
 CREATE POLICY "Users can view only their own patterns"
   ON public.tutorials FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create their own patterns" ON public.tutorials;
 CREATE POLICY "Users can create their own patterns"
   ON public.tutorials FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own patterns" ON public.tutorials;
 CREATE POLICY "Users can update their own patterns"
   ON public.tutorials FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own patterns" ON public.tutorials;
 CREATE POLICY "Users can delete their own patterns"
   ON public.tutorials FOR DELETE
   USING (auth.uid() = user_id);
@@ -107,6 +114,7 @@ CREATE TABLE IF NOT EXISTS public.checklist_items (
 ALTER TABLE public.checklist_items ENABLE ROW LEVEL SECURITY;
 
 -- Checklist Items RLS Policies (via join with tutorial.user_id)
+DROP POLICY IF EXISTS "Users can view checklist items for their own patterns" ON public.checklist_items;
 CREATE POLICY "Users can view checklist items for their own patterns"
   ON public.checklist_items FOR SELECT
   USING (
@@ -117,6 +125,7 @@ CREATE POLICY "Users can view checklist items for their own patterns"
     )
   );
 
+DROP POLICY IF EXISTS "Users can create checklist items for their own patterns" ON public.checklist_items;
 CREATE POLICY "Users can create checklist items for their own patterns"
   ON public.checklist_items FOR INSERT
   WITH CHECK (
@@ -127,6 +136,7 @@ CREATE POLICY "Users can create checklist items for their own patterns"
     )
   );
 
+DROP POLICY IF EXISTS "Users can update checklist items for their own patterns" ON public.checklist_items;
 CREATE POLICY "Users can update checklist items for their own patterns"
   ON public.checklist_items FOR UPDATE
   USING (
@@ -137,6 +147,7 @@ CREATE POLICY "Users can update checklist items for their own patterns"
     )
   );
 
+DROP POLICY IF EXISTS "Users can delete checklist items for their own patterns" ON public.checklist_items;
 CREATE POLICY "Users can delete checklist items for their own patterns"
   ON public.checklist_items FOR DELETE
   USING (
@@ -162,6 +173,7 @@ CREATE TABLE IF NOT EXISTS public.translations (
 ALTER TABLE public.translations ENABLE ROW LEVEL SECURITY;
 
 -- Translations RLS Policies
+DROP POLICY IF EXISTS "Users can view translations for their own patterns" ON public.translations;
 CREATE POLICY "Users can view translations for their own patterns"
   ON public.translations FOR SELECT
   USING (
@@ -172,6 +184,7 @@ CREATE POLICY "Users can view translations for their own patterns"
     )
   );
 
+DROP POLICY IF EXISTS "Users can create translations for their own patterns" ON public.translations;
 CREATE POLICY "Users can create translations for their own patterns"
   ON public.translations FOR INSERT
   WITH CHECK (
@@ -182,6 +195,7 @@ CREATE POLICY "Users can create translations for their own patterns"
     )
   );
 
+DROP POLICY IF EXISTS "Users can update translations for their own patterns" ON public.translations;
 CREATE POLICY "Users can update translations for their own patterns"
   ON public.translations FOR UPDATE
   USING (
@@ -204,6 +218,7 @@ CREATE TABLE IF NOT EXISTS public.progress_counters (
 
 ALTER TABLE public.progress_counters ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own counter" ON public.progress_counters;
 CREATE POLICY "Users can manage their own counter"
   ON public.progress_counters FOR ALL
   USING (
