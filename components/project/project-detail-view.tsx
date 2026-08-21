@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useRef, useTransition } from 'react';
 import Link from 'next/link';
 import confetti from 'canvas-confetti';
 import {
@@ -13,6 +13,7 @@ import {
   EyeOff,
   Edit2,
   Check,
+  CheckCheck,
   Copy,
   X,
   Trash2,
@@ -31,10 +32,12 @@ import {
   ZoomIn,
   ZoomOut,
   Tag,
+  BookOpen,
 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/context';
 import { CategoryBadge, CategoryIcon, getCategoryStyle } from '@/components/ui/category-icon';
-import { StitchTerm } from '@/components/ui/stitch-term';
+import { LevelBadge, LevelIcon, getLevelStyle } from '@/components/ui/level-icon';
+import { GlossaryModal } from '@/components/ui/glossary-modal';
 import type { Tutorial, ChecklistItem, TutorialMaterial } from '@/lib/types/database';
 import {
   toggleChecklistItem,
@@ -42,6 +45,7 @@ import {
   resetAllChecklistItems,
   resetSectionChecklistItems,
   checkAllChecklistItems,
+  updateChecklistItemsBatch,
   deleteTutorial,
   getOrTranslatePatternAction,
   updateTutorialDetails,
@@ -60,88 +64,19 @@ interface ProjectDetailViewProps {
   initialTranslations?: Record<string, TranslatedPatternContent>;
 }
 
-// Known crochet terms for inline abbreviation highlighting
-const STITCH_KEYS = [
-  'cercle magique',
-  'magic ring',
-  'magic loop',
-  'sl st',
-  'ms',
-  'sc',
-  'aug',
-  'inc',
-  'dim',
-  'dec',
-  'CM',
-  'MR',
-  'ml',
-  'ch',
-  'mc',
-  'db',
-  'hdc',
-  'br',
-  'dc',
-  'st',
-  'm',
-];
-
 /**
- * Reactive interactive badge and tooltip for the total stitch count of a row (e.g. [18]).
+ * Visual badge for the total stitch count of a row (e.g. [18]).
  */
 function StitchCountBadge({ count }: { count: string }) {
-  const { locale } = useI18n();
-  const [isOpen, setIsOpen] = useState(false);
-  const isFr = locale === 'fr';
-
   return (
-    <span
-      className="relative inline-block ml-2 select-none"
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-      onClick={(e) => {
-        e.stopPropagation();
-        setIsOpen(!isOpen);
-      }}
-    >
-      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-sage-100/90 hover:bg-sage-200/90 text-sage-900 border border-sage-200/80 shadow-2xs cursor-help transition-colors">
-        {count}
-      </span>
-
-      {/* Reactive Tooltip Popup (Identical styling to StitchTerm) */}
-      <span
-        className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-56 max-w-[85vw] p-3 rounded-2xl bg-yarn-900 text-white text-xs shadow-lift border border-yarn-800 transition-all duration-200 ${
-          isOpen
-            ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto visible'
-            : 'opacity-0 scale-95 translate-y-1 pointer-events-none invisible'
-        }`}
-        role="tooltip"
-      >
-        <div className="space-y-1 text-left font-sans">
-          <div className="flex items-center justify-between border-b border-yarn-800 pb-1 mb-1">
-            <span className="font-bold text-sage-300 font-serif text-xs">
-              {isFr ? 'Total de mailles' : 'Stitch Count'}
-            </span>
-            <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-yarn-800 text-sage-300">
-              {count}
-            </span>
-          </div>
-          <p className="text-yarn-300 text-[11px] leading-relaxed">
-            {isFr
-              ? 'Nombre total de mailles à obtenir à la fin de ce rang.'
-              : 'Total number of stitches to have at the end of this round.'}
-          </p>
-        </div>
-
-        {/* Tooltip Arrow */}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-yarn-900" />
-      </span>
+    <span className="inline-flex items-center ml-2 px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-sage-100/90 text-sage-900 border border-sage-200/80 shadow-2xs select-none">
+      {count}
     </span>
   );
 }
 
 /**
- * Parses text and wraps matching crochet terms in interactive <StitchTerm> tooltips,
- * and formats the ending stitch count (e.g. [18]) as a distinct visual badge.
+ * Formats row text and renders ending stitch count (e.g. [18]) as a visual badge.
  */
 function renderWithStitchTerms(text: string) {
   if (!text) return null;
@@ -149,38 +84,18 @@ function renderWithStitchTerms(text: string) {
   // Detect stitch count at end of line like [18], [6 ms], or (18 sts)
   const stitchCountMatch = text.match(/(\s*(\[[0-9]+\s*[a-zA-Z]*\]|\([0-9]+\s*[a-zA-Z]*\))\s*)$/);
 
-  let mainText = text;
-  let countBadge: string | null = null;
-
   if (stitchCountMatch && typeof stitchCountMatch.index === 'number') {
-    mainText = text.substring(0, stitchCountMatch.index);
-    countBadge = stitchCountMatch[2]; // e.g. "[18]" or "(18)"
+    const mainText = text.substring(0, stitchCountMatch.index);
+    const countBadge = stitchCountMatch[2]; // e.g. "[18]" or "(18)"
+    return (
+      <span>
+        {mainText}
+        <StitchCountBadge count={countBadge} />
+      </span>
+    );
   }
 
-  // Split by word boundaries while keeping delimiters
-  const regex = new RegExp(`\\b(${STITCH_KEYS.join('|')})\\b`, 'gi');
-  const parts = mainText.split(regex);
-
-  const renderedContent = parts.map((part, index) => {
-    const lower = part.toLowerCase();
-    const matched = STITCH_KEYS.find((k) => k.toLowerCase() === lower);
-
-    if (matched) {
-      return (
-        <StitchTerm key={`${index}-${part}`} term={matched}>
-          {part}
-        </StitchTerm>
-      );
-    }
-    return <React.Fragment key={index}>{part}</React.Fragment>;
-  });
-
-  return (
-    <span>
-      {renderedContent}
-      {countBadge && <StitchCountBadge count={countBadge} />}
-    </span>
-  );
+  return <span>{text}</span>;
 }
 
 /**
@@ -427,9 +342,8 @@ function ZoomableImageViewer({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onClick={handleClickImage}
-        className={`flex-1 w-full relative flex items-center justify-center overflow-hidden rounded-2xl bg-yarn-950/5 border border-yarn-200/60 ${
-          zoomLevel > 1 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-zoom-in'
-        }`}
+        className={`flex-1 w-full relative flex items-center justify-center overflow-hidden rounded-2xl bg-yarn-950/5 border border-yarn-200/60 ${zoomLevel > 1 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-zoom-in'
+          }`}
       >
         {/* Floating Lateral Chevrons on Image for Fast Clicking */}
         {allImageUrls.length > 1 && (
@@ -488,11 +402,10 @@ function ZoomableImageViewer({
                 key={idx}
                 type="button"
                 onClick={() => setCurrentImageIndex(idx)}
-                className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden border-2 transition-all flex-shrink-0 cursor-pointer ${
-                  currentImageIndex === idx
-                    ? 'border-sage-700 scale-105 shadow-soft ring-2 ring-sage-200'
-                    : 'border-transparent opacity-50 hover:opacity-100 hover:scale-100'
-                }`}
+                className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden border-2 transition-all flex-shrink-0 cursor-pointer ${currentImageIndex === idx
+                  ? 'border-sage-700 scale-105 shadow-soft ring-2 ring-sage-200'
+                  : 'border-transparent opacity-50 hover:opacity-100 hover:scale-100'
+                  }`}
                 title={`Page ${idx + 1}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -527,7 +440,6 @@ export function ProjectDetailView({
   // Item currently being edited inline
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editNote, setEditNote] = useState('');
 
   // Delete modal state
@@ -541,7 +453,10 @@ export function ProjectDetailView({
   const [projectLevel, setProjectLevel] = useState(tutorial.level || '');
   const [projectType, setProjectType] = useState(tutorial.project_type || '');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showSectionsDropdown, setShowSectionsDropdown] = useState(false);
   const [isSavingDetails, setIsSavingDetails] = useState(false);
+  const [isNoteExpandedMobile, setIsNoteExpandedMobile] = useState(false);
+  const [showGlossaryModal, setShowGlossaryModal] = useState(false);
 
   // Dropdown options for Edit Modal
   const EDIT_LEVEL_OPTIONS = [
@@ -570,9 +485,45 @@ export function ProjectDetailView({
   const [showEditLevelDropdown, setShowEditLevelDropdown] = useState(false);
   const [showEditCategoryDropdown, setShowEditCategoryDropdown] = useState(false);
 
+  // Dropdown Refs for reliable click-outside dismissal
+  const languageDropdownRef = useRef<HTMLDivElement>(null);
+  const sectionsDropdownRef = useRef<HTMLDivElement>(null);
+  const editCategoryDropdownRef = useRef<HTMLDivElement>(null);
+  const editLevelDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (languageDropdownRef.current && !languageDropdownRef.current.contains(target)) {
+        setShowLanguageDropdown(false);
+      }
+      if (sectionsDropdownRef.current && !sectionsDropdownRef.current.contains(target)) {
+        setShowSectionsDropdown(false);
+      }
+      if (editCategoryDropdownRef.current && !editCategoryDropdownRef.current.contains(target)) {
+        setShowEditCategoryDropdown(false);
+      }
+      if (editLevelDropdownRef.current && !editLevelDropdownRef.current.contains(target)) {
+        setShowEditLevelDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
+
   const openEditModal = () => {
-    setEditTitleInput(projectTitle);
-    setEditNoteInput(projectNote);
+    const activeTrans = currentLanguage !== 'original' ? translationsCache[currentLanguage] : null;
+    setEditTitleInput(activeTrans?.title || projectTitle);
+    setEditNoteInput(
+      activeTrans?.note !== undefined && activeTrans?.note !== null
+        ? activeTrans.note
+        : projectNote
+    );
     setEditStitchInput(projectStitch);
     setEditLevelInput(projectLevel);
     setEditProjectTypeInput(projectType);
@@ -580,6 +531,18 @@ export function ProjectDetailView({
     setShowEditCategoryDropdown(false);
     setIsEditModalOpen(true);
   };
+
+  // Lock body scroll when edit details modal/drawer is open
+  useEffect(() => {
+    if (isEditModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isEditModalOpen]);
 
   const handleSaveDetails = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -600,6 +563,22 @@ export function ProjectDetailView({
       setProjectStitch(editStitchInput.trim());
       setProjectLevel(editLevelInput.trim());
       setProjectType(editProjectTypeInput.trim());
+
+      // Synchronize in all cached translations so active language reflects updates instantly
+      setTranslationsCache((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((lang) => {
+          if (next[lang]) {
+            next[lang] = {
+              ...next[lang],
+              title: editTitleInput.trim(),
+              note: editNoteInput.trim() || null,
+            };
+          }
+        });
+        return next;
+      });
+
       setIsEditModalOpen(false);
 
       setTranslationToast({
@@ -868,42 +847,41 @@ export function ProjectDetailView({
     });
   };
 
-  // Handle row label save
-  const handleSaveLabel = (itemId: string) => {
+  // Handle start inline edit for a step (instructions + note)
+  const handleStartEditItem = (item: { id: string; label: string; note?: string | null }) => {
+    setEditingItemId(item.id);
+    setEditLabel(item.label);
+    setEditNote(item.note || '');
+  };
+
+  // Handle save step (instructions + note)
+  const handleSaveItem = (itemId: string) => {
     if (!editLabel.trim()) return;
 
+    const trimmedLabel = editLabel.trim();
+    const trimmedNote = editNote.trim() || null;
+
     const updated = items.map((i) =>
-      i.id === itemId ? { ...i, label: editLabel.trim(), edited_by_user: true } : i
+      i.id === itemId
+        ? { ...i, label: trimmedLabel, note: trimmedNote, edited_by_user: true }
+        : i
     );
     setItems(updated);
     setEditingItemId(null);
 
-    const currentItem = items.find((i) => i.id === itemId);
     startTransition(async () => {
       try {
-        await updateChecklistItem(itemId, editLabel, currentItem?.note);
+        await updateChecklistItem(itemId, trimmedLabel, trimmedNote);
       } catch (err) {
-        console.error('Failed to update item label:', err);
+        console.error('Failed to update step:', err);
       }
     });
   };
 
-  // Handle row note save
-  const handleSaveNote = (itemId: string) => {
-    const updated = items.map((i) =>
-      i.id === itemId ? { ...i, note: editNote.trim() || null } : i
-    );
-    setItems(updated);
-    setEditingNoteId(null);
-
-    const currentItem = items.find((i) => i.id === itemId);
-    startTransition(async () => {
-      try {
-        await updateChecklistItem(itemId, currentItem?.label || '', editNote);
-      } catch (err) {
-        console.error('Failed to update note:', err);
-      }
-    });
+  const handleCancelEdit = () => {
+    setEditingItemId(null);
+    setEditLabel('');
+    setEditNote('');
   };
 
   // Handle delete item
@@ -912,7 +890,22 @@ export function ProjectDetailView({
     setItems(updated);
   };
 
-  // Handle reset all
+  // Handle check all items globally
+  const handleCheckAll = (e?: React.MouseEvent) => {
+    setItems((prev) => prev.map((i) => ({ ...i, checked: true })));
+    setBumpKey((k) => k + 1);
+    triggerGrandConfetti();
+
+    startTransition(async () => {
+      try {
+        await checkAllChecklistItems(tutorial.id);
+      } catch (err) {
+        console.error('Failed to check all:', err);
+      }
+    });
+  };
+
+  // Handle reset all items globally
   const handleResetAll = () => {
     setItems((prev) => prev.map((i) => ({ ...i, checked: false })));
     setSectionOverrides({});
@@ -929,35 +922,39 @@ export function ProjectDetailView({
     });
   };
 
-  // Handle reset single section
-  const handleResetSection = (sectionName: string) => {
-    const updated = items.map((i) =>
-      i.section === sectionName ? { ...i, checked: false } : i
+  // Handle check all items in a specific section / sub-section
+  const handleCheckSection = (targetItems: ChecklistItem[], e?: React.MouseEvent) => {
+    const itemIds = targetItems.map((i) => i.id);
+    const idSet = new Set(itemIds);
+    setItems((prev) =>
+      prev.map((i) => (idSet.has(i.id) ? { ...i, checked: true } : i))
     );
-    setItems(updated);
+    setBumpKey((k) => k + 1);
+    triggerStepConfetti(e);
+
     startTransition(async () => {
       try {
-        await resetSectionChecklistItems(tutorial.id, sectionName);
+        await updateChecklistItemsBatch(tutorial.id, itemIds, true);
       } catch (err) {
-        console.error('Failed to reset section:', err);
+        console.error('Failed to check section items:', err);
       }
     });
   };
 
-  // Handle reset multiple sub-sections (e.g. all of Jambes)
-  const handleResetMultipleSections = (sectionNames: string[]) => {
-    const nameSet = new Set(sectionNames);
-    const updated = items.map((i) =>
-      nameSet.has(i.section) ? { ...i, checked: false } : i
+  // Handle reset all items in a specific section / sub-section
+  const handleResetSection = (targetItems: ChecklistItem[]) => {
+    const itemIds = targetItems.map((i) => i.id);
+    const idSet = new Set(itemIds);
+    setItems((prev) =>
+      prev.map((i) => (idSet.has(i.id) ? { ...i, checked: false } : i))
     );
-    setItems(updated);
+    setBumpKey((k) => k + 1);
+
     startTransition(async () => {
       try {
-        for (const secName of sectionNames) {
-          await resetSectionChecklistItems(tutorial.id, secName);
-        }
+        await updateChecklistItemsBatch(tutorial.id, itemIds, false);
       } catch (err) {
-        console.error('Failed to reset group sections:', err);
+        console.error('Failed to reset section items:', err);
       }
     });
   };
@@ -978,27 +975,27 @@ export function ProjectDetailView({
 
   const displayItems = activeTranslation
     ? items.map((item) => {
-        const transStep = activeTranslation.steps.find((s) => s.order_index === item.order_index);
-        if (transStep) {
-          const rawNote = item.edited_by_user
-            ? item.note
-            : (transStep.note !== undefined && transStep.note !== null ? transStep.note : item.note);
-          return {
-            ...item,
-            label: item.edited_by_user ? item.label : transStep.label,
-            section: transStep.section || item.section,
-            note: cleanNoteValue(rawNote),
-          };
-        }
+      const transStep = activeTranslation.steps.find((s) => s.order_index === item.order_index);
+      if (transStep) {
+        const rawNote = item.edited_by_user
+          ? item.note
+          : (transStep.note !== undefined && transStep.note !== null ? transStep.note : item.note);
         return {
           ...item,
-          note: cleanNoteValue(item.note),
+          label: item.edited_by_user ? item.label : transStep.label,
+          section: transStep.section || item.section,
+          note: cleanNoteValue(rawNote),
         };
-      })
-    : items.map((item) => ({
+      }
+      return {
         ...item,
         note: cleanNoteValue(item.note),
-      }));
+      };
+    })
+    : items.map((item) => ({
+      ...item,
+      note: cleanNoteValue(item.note),
+    }));
 
   // Group checklist items by section and automatically group pairs/multiples
   const rawSectionsMap = displayItems.reduce<Record<string, ChecklistItem[]>>((acc, item) => {
@@ -1104,83 +1101,83 @@ export function ProjectDetailView({
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-8 pb-16 transition-all duration-300">
-      {/* Unified Sticky Reader Bar (Project Title + Navigation + Progress + Tools in White Glass Card) */}
-      <div className="sticky top-2 sm:top-3 z-30 p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-2xl border border-yarn-200/90 shadow-lift ring-1 ring-black/[0.04] space-y-3 sm:space-y-3.5 transition-all">
+      {/* Unified Sticky Reader Bar (Applies transform scale & elevated shadow dynamically when sticky/scrolled) */}
+      <div
+        className={`sticky top-2 sm:top-3 z-30 p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-2xl border border-yarn-200/90 space-y-3 sm:space-y-3.5 transition-all duration-300 ease-out ${
+          isScrolled
+            ? 'transform scale-[1.015] sm:scale-[1.02] shadow-2xl ring-1 ring-black/[0.08]'
+            : 'scale-100 shadow-lift ring-1 ring-black/[0.04]'
+        }`}
+      >
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3.5">
-          {/* Left: Quick Back + Progress Percent Badge + Project Title + Counters */}
-          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
-            <Link
-              href="/library"
-              title={t.project.backToLibrary}
-              className="p-2 sm:p-2.5 rounded-2xl bg-yarn-100/80 hover:bg-yarn-200 text-yarn-800 hover:text-yarn-950 transition-all shrink-0 flex items-center justify-center border border-yarn-200/90 shadow-2xs hover:scale-105 active:scale-95"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
+          {/* Left: Quick Back + Project Title + Badges + Counters */}
+          <div className="flex items-center justify-between gap-2.5 sm:gap-3.5 min-w-0 flex-1">
+            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
+              <Link
+                href="/library"
+                title={t.project.backToLibrary}
+                className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl sm:rounded-2xl bg-yarn-100/80 hover:bg-yarn-200 text-yarn-800 hover:text-yarn-950 transition-all shrink-0 inline-flex items-center justify-center border border-yarn-200/90 shadow-2xs hover:scale-105 active:scale-95 p-0 cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Link>
 
-            {/* Prominent Circular/Squircle Progress Badge with Tactile Pop */}
-            <div
-              key={`badge-progress-${bumpKey}`}
-              className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 font-bold shadow-soft transition-colors duration-200 ${
-                bumpKey > 0 ? 'animate-badge-pop' : ''
-              } ${
-                isAllDone
-                  ? 'bg-gradient-to-br from-emerald-600 to-teal-500 text-white ring-2 ring-emerald-400/50 shadow-emerald-700/20'
-                  : progressPercent > 0
-                  ? 'bg-gradient-to-br from-orange-500 to-amber-400 text-white ring-2 ring-orange-400/50 shadow-orange-500/20'
-                  : 'bg-gradient-to-br from-rose-400 to-rose-500 text-white ring-2 ring-rose-300/40 shadow-rose-500/10'
-              }`}
-            >
-              {isAllDone ? (
-                <Sparkles className="w-4 h-4 text-emerald-100 animate-pulse" />
-              ) : (
-                <span className="text-xs sm:text-sm font-extrabold tracking-tight leading-none text-white">
-                  {progressPercent}%
-                </span>
-              )}
-            </div>
-
-            <div className="min-w-0 flex-1 space-y-0.5">
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
-                <h1 className="text-sm sm:text-xl font-bold font-serif text-yarn-950 tracking-tight truncate max-w-[180px] sm:max-w-none">
-                  {displayTitle}
-                </h1>
-                {projectType && (
-                  <CategoryBadge
-                    category={projectType}
-                    label={(t.project.projectTypes as any)?.[projectType.toLowerCase()] || projectType}
-                    className="hidden sm:inline-flex py-0.5 text-[10px]"
-                  />
-                )}
-                {projectLevel && (
-                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-sage-100 text-sage-900 border border-sage-200 shrink-0">
-                    <Layers className="w-2.5 h-2.5 text-sage-700 shrink-0" />
-                    <span>{(t.project.levels as any)?.[projectLevel.toLowerCase()] || projectLevel}</span>
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-semibold text-yarn-600">
-                <span
-                  className={`truncate font-bold ${
-                    isAllDone
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                  <h1 className="text-sm sm:text-xl font-bold font-serif text-yarn-950 tracking-tight truncate max-w-[150px] xs:max-w-[200px] sm:max-w-none">
+                    {displayTitle}
+                  </h1>
+                  {/* Desktop Badges beside title */}
+                  {projectType && (
+                    <CategoryBadge
+                      category={projectType}
+                      label={(t.project.projectTypes as any)?.[projectType.toLowerCase()] || projectType}
+                      className="hidden sm:inline-flex"
+                    />
+                  )}
+                  {projectLevel && (
+                    <LevelBadge
+                      level={projectLevel}
+                      label={(t.project.levels as any)?.[projectLevel.toLowerCase()] || projectLevel}
+                      className="hidden sm:inline-flex"
+                    />
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-semibold text-yarn-600">
+                  <span
+                    className={`truncate font-bold ${isAllDone
                       ? 'text-emerald-700'
                       : progressPercent > 0
-                      ? 'text-orange-500'
-                      : 'text-rose-600'
-                  }`}
-                >
-                  {completedCount} / {totalItems} {t.project.roundsCompleted}
-                </span>
-                {isAllDone && (
-                  <span className="text-[10px] sm:text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300 shrink-0">
-                    {t.project.allDone}
+                        ? 'text-orange-500'
+                        : 'text-rose-600'
+                      }`}
+                  >
+                    {completedCount} / {totalItems} {t.project.roundsCompleted}
                   </span>
-                )}
+                </div>
               </div>
+            </div>
+
+            {/* Mobile Top-Right Badges (Category & Level stacked vertically) */}
+            <div className="flex flex-col items-end gap-1 shrink-0 sm:hidden">
+              {projectType && (
+                <CategoryBadge
+                  category={projectType}
+                  label={(t.project.projectTypes as any)?.[projectType.toLowerCase()] || projectType}
+                  className="h-5 px-2 text-[9px]"
+                />
+              )}
+              {projectLevel && (
+                <LevelBadge
+                  level={projectLevel}
+                  label={(t.project.levels as any)?.[projectLevel.toLowerCase()] || projectLevel}
+                  className="h-5 px-2 text-[9px]"
+                />
+              )}
             </div>
           </div>
 
-          {/* Right: Action Buttons */}
-          <div className="flex items-center justify-end gap-2 shrink-0">
+          {/* Right: Action Buttons (Responsive Toolbar - 100% visible on mobile, no clipping) */}
+          <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto shrink-0">
             {/* Language & Technical Translation Switcher Dropdown */}
             {(() => {
               const sourceLang = getSourceLanguageInfo(tutorial.raw_content_language);
@@ -1190,16 +1187,15 @@ export function ProjectDetailView({
                 : SUPPORTED_TRANSLATION_LANGUAGES.find((l) => l.code === currentLanguage) || sourceLang;
 
               return (
-                <div className="relative">
+                <div ref={languageDropdownRef} className="relative shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
                     disabled={isTranslating}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 ${
-                      !isViewingOriginal
-                        ? 'bg-sage-100 text-sage-900 border-sage-300 shadow-xs'
-                        : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
-                    }`}
+                    className={`h-9 sm:h-10 inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 rounded-xl sm:rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer shrink-0 ${!isViewingOriginal
+                      ? 'bg-sage-100 text-sage-900 border-sage-300 shadow-xs'
+                      : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
+                      }`}
                     title={t.project.translationTitle}
                   >
                     {isTranslating ? (
@@ -1213,75 +1209,67 @@ export function ProjectDetailView({
                     <ChevronDown className="w-3 h-3 text-yarn-500" />
                   </button>
 
-                  {/* Floating Dropdown Menu (Compact, content-fitted, no scrollbar) */}
+                  {/* Floating Dropdown Menu (Compact, content-fitted, no scrollbar, responsive alignment) */}
                   {showLanguageDropdown && (
-                    <>
-                      <div
-                        className="fixed inset-0 z-40 bg-transparent"
-                        onClick={() => setShowLanguageDropdown(false)}
-                      />
-                      <div className="absolute right-0 mt-2 w-48 sm:w-52 rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn">
-                        {/* Source Language Option */}
-                        <div className="px-2.5 py-1 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
-                          {t.project.originalLanguage}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleSelectLanguage('original')}
-                          className={`w-full text-left px-2.5 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
-                            isViewingOriginal ? 'font-bold text-sage-900 bg-sage-50' : 'text-yarn-800 hover:bg-yarn-50'
-                          }`}
-                        >
-                          <span className="flex items-center gap-2 truncate">
-                            <span className="text-sm shrink-0">{sourceLang.flag}</span>
-                            <span className="truncate font-medium">
-                              {(t.project.languageNames as any)?.[sourceLang.code] || sourceLang.nativeName}
-                            </span>
-                          </span>
-                          {isViewingOriginal && <Check className="w-3.5 h-3.5 text-sage-700 shrink-0 ml-1.5" />}
-                        </button>
-
-                        <div className="h-px bg-yarn-100 my-1" />
-
-                        {/* Supported Languages (Excluding Source Language) */}
-                        <div className="px-2.5 py-1 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
-                          {t.project.translateTo}
-                        </div>
-
-                        <div className="space-y-0.5">
-                          {SUPPORTED_TRANSLATION_LANGUAGES.filter((lang) => lang.code !== sourceLang.code).map((lang) => {
-                            const isSelected = currentLanguage === lang.code;
-                            const isCached = !!translationsCache[lang.code];
-                            return (
-                              <button
-                                key={lang.code}
-                                type="button"
-                                onClick={() => handleSelectLanguage(lang.code)}
-                                className={`w-full text-left px-2.5 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
-                                  isSelected ? 'font-bold text-sage-900 bg-sage-50' : 'text-yarn-800 hover:bg-yarn-50'
-                                }`}
-                              >
-                                <span className="flex items-center gap-2 truncate">
-                                  <span className="text-sm shrink-0">{lang.flag}</span>
-                                  <span className="truncate">
-                                    {(t.project.languageNames as any)?.[lang.code] || lang.nativeName}
-                                  </span>
-                                </span>
-                                <span className="flex items-center gap-1 shrink-0 ml-1.5">
-                                  {isCached && !isSelected && (
-                                    <span
-                                      className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-2xs"
-                                      title={t.project.translationCachedBadge}
-                                    />
-                                  )}
-                                  {isSelected && <Check className="w-3.5 h-3.5 text-sage-700" />}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
+                    <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 sm:w-52 max-w-[calc(100vw-2rem)] rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn">
+                      {/* Source Language Option */}
+                      <div className="px-2.5 py-1 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
+                        {t.project.originalLanguage}
                       </div>
-                    </>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectLanguage('original')}
+                        className={`w-full text-left px-2.5 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${isViewingOriginal ? 'font-bold text-sage-900 bg-sage-50' : 'text-yarn-800 hover:bg-yarn-50'
+                          }`}
+                      >
+                        <span className="flex items-center gap-2 truncate">
+                          <span className="text-sm shrink-0">{sourceLang.flag}</span>
+                          <span className="truncate font-medium">
+                            {(t.project.languageNames as any)?.[sourceLang.code] || sourceLang.nativeName}
+                          </span>
+                        </span>
+                        {isViewingOriginal && <Check className="w-3.5 h-3.5 text-sage-700 shrink-0 ml-1.5" />}
+                      </button>
+
+                      <div className="h-px bg-yarn-100 my-1" />
+
+                      {/* Supported Languages (Excluding Source Language) */}
+                      <div className="px-2.5 py-1 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
+                        {t.project.translateTo}
+                      </div>
+
+                      <div className="space-y-0.5">
+                        {SUPPORTED_TRANSLATION_LANGUAGES.filter((lang) => lang.code !== sourceLang.code).map((lang) => {
+                          const isSelected = currentLanguage === lang.code;
+                          const isCached = !!translationsCache[lang.code];
+                          return (
+                            <button
+                              key={lang.code}
+                              type="button"
+                              onClick={() => handleSelectLanguage(lang.code)}
+                              className={`w-full text-left px-2.5 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${isSelected ? 'font-bold text-sage-900 bg-sage-50' : 'text-yarn-800 hover:bg-yarn-50'
+                                }`}
+                            >
+                              <span className="flex items-center gap-2 truncate">
+                                <span className="text-sm shrink-0">{lang.flag}</span>
+                                <span className="truncate">
+                                  {(t.project.languageNames as any)?.[lang.code] || lang.nativeName}
+                                </span>
+                              </span>
+                              <span className="flex items-center gap-1 shrink-0 ml-1.5">
+                                {isCached && !isSelected && (
+                                  <span
+                                    className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-2xs"
+                                    title={t.project.translationCachedBadge}
+                                  />
+                                )}
+                                {isSelected && <Check className="w-3.5 h-3.5 text-sage-700" />}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
               );
@@ -1292,46 +1280,163 @@ export function ProjectDetailView({
               <button
                 type="button"
                 onClick={() => setShowOriginal(!showOriginal)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 ${
-                  showOriginal
-                    ? 'bg-sage-800 text-white border-sage-900 shadow-soft'
-                    : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
-                }`}
+                className={`h-9 w-9 sm:h-10 sm:w-auto inline-flex items-center justify-center gap-1.5 sm:px-3.5 rounded-xl sm:rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer shrink-0 ${showOriginal
+                  ? 'bg-sage-800 text-white border-sage-900 shadow-soft'
+                  : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
+                  }`}
+                title={showOriginal ? t.project.hideOriginalPattern : t.project.originalPattern}
               >
                 {showOriginal ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                <span className="hidden md:inline">
-                  {showOriginal
-                    ? tutorial.source_type === 'text'
-                      ? t.project.hideOriginalText
-                      : t.project.hideOriginal
-                    : tutorial.source_type === 'text'
-                    ? t.project.originalText
-                    : t.project.viewOriginal}
-                </span>
-                <span className="md:hidden text-[11px] uppercase">
-                  {tutorial.source_type === 'pdf' ? 'PDF' : tutorial.source_type === 'text' ? 'Texte' : 'Image'}
+                <span className="hidden sm:inline">
+                  {showOriginal ? t.project.hideOriginalPattern : t.project.originalPattern}
                 </span>
               </button>
             )}
+
+            {/* Sections Quick Navigation Dropdown */}
+            {sectionGroups.length > 0 && (
+              <div ref={sectionsDropdownRef} className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLanguageDropdown(false);
+                    setShowSectionsDropdown((prev) => !prev);
+                  }}
+                  className={`h-9 sm:h-10 inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 rounded-xl sm:rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer shrink-0 ${showSectionsDropdown
+                    ? 'bg-sage-100 text-sage-900 border-sage-300 shadow-xs'
+                    : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
+                    }`}
+                  title={t.project.sectionsDropdown || 'Sections du patron'}
+                >
+                  <Layers className="w-3.5 h-3.5 text-sage-700 shrink-0" />
+                  <span className="hidden md:inline">{t.project.sectionsDropdown || 'Sections'}</span>
+                  <span className="font-mono text-[10px] sm:text-[11px] font-bold text-sage-700 bg-sage-50 px-1 sm:px-1.5 py-0.5 rounded-md border border-sage-200 shrink-0">
+                    {sectionGroups.filter((g) => g.completedCount === g.totalCount && g.totalCount > 0).length}/{sectionGroups.length}
+                  </span>
+                  <ChevronDown className="w-3 h-3 text-yarn-500 hidden sm:inline" />
+                </button>
+
+                {showSectionsDropdown && (
+                  <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-64 sm:w-72 max-w-[calc(100vw-2rem)] rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn">
+                    <div className="px-2.5 py-1.5 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
+                      {t.project.sectionsProgress || 'Progression par section'}
+                    </div>
+
+                    <div className="space-y-0.5 max-h-72 overflow-y-auto">
+                      {sectionGroups.map((group) => {
+                        const isGroupDone = group.completedCount === group.totalCount && group.totalCount > 0;
+                        const percent = group.totalCount > 0 ? Math.round((group.completedCount / group.totalCount) * 100) : 0;
+                        return (
+                          <button
+                            key={group.groupTitle}
+                            type="button"
+                            onClick={() => {
+                              // Force open section accordion
+                              setSectionOverrides((prev) => ({
+                                ...prev,
+                                [group.groupTitle]: true,
+                              }));
+                              setShowSectionsDropdown(false);
+                              // Smooth scroll to section element accounting for sticky header height
+                              setTimeout(() => {
+                                const el = document.getElementById(`section-group-${encodeURIComponent(group.groupTitle)}`);
+                                if (el) {
+                                  const stickyHeader = document.querySelector('.sticky');
+                                  const headerHeight = stickyHeader ? stickyHeader.getBoundingClientRect().height : 100;
+                                  const elementPosition = el.getBoundingClientRect().top + window.scrollY;
+                                  const offsetPosition = elementPosition - headerHeight - 16;
+
+                                  window.scrollTo({
+                                    top: Math.max(0, offsetPosition),
+                                    behavior: 'smooth',
+                                  });
+                                }
+                              }, 100);
+                            }}
+                            className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-yarn-50 text-yarn-900 transition-colors cursor-pointer flex items-center justify-between gap-2.5"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 truncate font-semibold">
+                                <span className="truncate">{group.groupTitle}</span>
+                                {group.isMultiple && (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-yarn-100 text-yarn-700 border border-yarn-200 shrink-0">
+                                    x{group.subSections.length}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Mini progress bar */}
+                              <div className="w-full bg-yarn-200/80 h-1 rounded-full overflow-hidden mt-1.5">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-300 ${isGroupDone ? 'bg-emerald-500' : percent > 0 ? 'bg-orange-400' : 'bg-transparent'
+                                    }`}
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0 text-right">
+                              <span className="font-mono text-[11px] font-bold text-yarn-600">
+                                {group.completedCount}/{group.totalCount}
+                              </span>
+                              {isGroupDone ? (
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                              ) : (
+                                <span
+                                  className={`w-4 h-4 text-[10px] font-mono flex items-center justify-center ${percent > 0 ? 'text-orange-500 font-bold' : 'text-rose-500 font-bold'
+                                    }`}
+                                >
+                                  {percent}%
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Glossary Modal Button */}
+            <button
+              type="button"
+              onClick={() => setShowGlossaryModal(true)}
+              title={t.project.glossaryButton}
+              className="h-9 w-9 sm:h-10 sm:w-auto sm:px-3 rounded-xl sm:rounded-2xl bg-white hover:bg-yarn-100 border border-yarn-300 text-yarn-700 hover:text-yarn-950 transition-all shadow-2xs hover:scale-105 active:scale-95 shrink-0 inline-flex items-center justify-center gap-1.5 cursor-pointer font-bold text-xs sm:text-sm"
+            >
+              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sage-700 shrink-0" />
+              <span className="hidden md:inline">{t.project.glossaryButton}</span>
+            </button>
 
             {/* Edit Project Details Button */}
             <button
               type="button"
               onClick={openEditModal}
               title={t.project.editDetails}
-              className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-yarn-100 border border-yarn-300 text-yarn-700 hover:text-yarn-950 transition-all shadow-2xs hover:scale-105 active:scale-95"
+              className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl sm:rounded-2xl bg-white hover:bg-yarn-100 border border-yarn-300 text-yarn-700 hover:text-yarn-950 transition-all shadow-2xs hover:scale-105 active:scale-95 shrink-0 inline-flex items-center justify-center p-0 cursor-pointer"
             >
               <Edit2 className="w-3.5 h-3.5" />
             </button>
 
-            {/* Reset All Checkboxes Button (Placed at the end as a reset/destructive action) */}
+            {/* Check All Checkboxes Button */}
+            <button
+              type="button"
+              onClick={handleCheckAll}
+              title={t.project.checkAll}
+              className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl sm:rounded-2xl bg-white hover:bg-emerald-50 border border-yarn-300 hover:border-emerald-300 text-emerald-600 hover:text-emerald-700 transition-all shadow-2xs hover:scale-105 active:scale-95 shrink-0 inline-flex items-center justify-center p-0 cursor-pointer"
+            >
+              <CheckCheck className="w-4 h-4" />
+            </button>
+
+            {/* Reset All Checkboxes Button */}
             <button
               type="button"
               onClick={handleResetAll}
               title={t.project.uncheckAll}
-              className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-yarn-100 border border-yarn-300 text-yarn-700 hover:text-yarn-950 transition-all shadow-2xs hover:scale-105 active:scale-95"
+              className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl sm:rounded-2xl bg-white hover:bg-rose-50 border border-yarn-300 hover:border-rose-200 text-yarn-700 hover:text-rose-700 transition-all shadow-2xs hover:scale-105 active:scale-95 shrink-0 inline-flex items-center justify-center p-0 cursor-pointer"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-3.5 h-3.5 text-rose-500" />
             </button>
           </div>
         </div>
@@ -1339,30 +1444,52 @@ export function ProjectDetailView({
         {/* Description & Notes (integrated in progress card, automatically collapses when scrolling) */}
         {displayNote && (
           <div
-            className={`transition-all duration-300 ease-out overflow-hidden ${
-              isScrolled
-                ? 'max-h-0 opacity-0 my-0 py-0 pointer-events-none'
-                : 'max-h-96 opacity-100 pt-3 border-t border-yarn-100'
-            }`}
+            className={`transition-all duration-300 ease-out overflow-hidden ${isScrolled
+              ? 'max-h-0 opacity-0 my-0 py-0 pointer-events-none'
+              : 'max-h-96 opacity-100 pt-2.5 sm:pt-3 border-t border-yarn-100'
+              }`}
           >
-            <p className="text-xs sm:text-sm text-yarn-700 leading-relaxed whitespace-pre-wrap">
+            <p className={`text-xs sm:text-sm text-yarn-700 leading-relaxed whitespace-pre-wrap ${!isNoteExpandedMobile ? 'line-clamp-2 sm:line-clamp-none' : ''}`}>
               {displayNote}
             </p>
+            {displayNote.length > 90 && (
+              <button
+                type="button"
+                onClick={() => setIsNoteExpandedMobile((prev) => !prev)}
+                className="sm:hidden text-[11px] font-bold text-sage-800 hover:text-sage-950 mt-1 inline-flex items-center gap-0.5 cursor-pointer"
+              >
+                <span>{isNoteExpandedMobile ? t.project.showLess : t.project.showMore}</span>
+              </button>
+            )}
           </div>
         )}
 
-        {/* Prominent Glow Progress Track: Red / Orange / Green */}
-        <div className="w-full h-2 sm:h-3 rounded-full bg-yarn-100 overflow-hidden border border-yarn-200/90 shadow-inner p-0.5">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ease-out ${
-              isAllDone
+        {/* Prominent Glow Progress Track + Percentage on the right */}
+        <div className="flex items-center gap-2.5 sm:gap-3.5 w-full pt-0.5">
+          <div className="flex-1 h-2 sm:h-2.5 rounded-full bg-yarn-100 overflow-hidden border border-yarn-200/90 shadow-inner p-0.5">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ease-out ${isAllDone
                 ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-400 shadow-sm shadow-emerald-500/20'
                 : progressPercent > 0
-                ? 'bg-gradient-to-r from-orange-500 via-amber-400 to-orange-400 shadow-sm shadow-orange-500/20'
-                : 'bg-rose-300'
-            }`}
-            style={{ width: `${progressPercent}%` }}
-          />
+                  ? 'bg-gradient-to-r from-orange-500 via-amber-400 to-orange-400 shadow-sm shadow-orange-500/20'
+                  : 'bg-rose-300'
+                }`}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+
+          <span
+            key={`badge-progress-${bumpKey}`}
+            className={`text-xs sm:text-sm font-extrabold font-mono shrink-0 min-w-[2.75rem] text-right transition-all ${bumpKey > 0 ? 'animate-badge-pop' : ''
+              } ${isAllDone
+                ? 'text-emerald-700'
+                : progressPercent > 0
+                  ? 'text-orange-600'
+                  : 'text-rose-600'
+              }`}
+          >
+            {progressPercent}%
+          </span>
         </div>
       </div>
 
@@ -1379,15 +1506,13 @@ export function ProjectDetailView({
 
             return (
               <div
-                className={`rounded-3xl bg-white border border-yarn-200 shadow-soft transition-all duration-200 ${
-                  isMaterialsCollapsed ? 'p-4 sm:p-5' : 'p-5 sm:p-6 space-y-4'
-                }`}
+                className={`rounded-3xl bg-white border border-yarn-200 shadow-soft transition-all duration-200 ${isMaterialsCollapsed ? 'p-4 sm:p-5' : 'p-5 sm:p-6 space-y-4'
+                  }`}
               >
                 <div
                   onClick={() => setMaterialsOverride(!isMaterialsCollapsed)}
-                  className={`flex items-center justify-between gap-3 flex-wrap cursor-pointer select-none group ${
-                    isMaterialsCollapsed ? '' : 'border-b border-yarn-100 pb-3'
-                  }`}
+                  className={`flex items-center justify-between gap-3 flex-wrap cursor-pointer select-none group ${isMaterialsCollapsed ? '' : 'border-b border-yarn-100 pb-3'
+                    }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <Volleyball className="w-4 h-4 text-sage-700 shrink-0" />
@@ -1426,75 +1551,75 @@ export function ProjectDetailView({
 
                     <div className="p-1 text-yarn-400 group-hover:text-yarn-800 transition-colors">
                       <ChevronDown
-                        className={`w-5 h-5 transition-transform duration-200 ${
-                          isMaterialsCollapsed ? '-rotate-90' : 'rotate-0'
-                        }`}
+                        className={`w-5 h-5 transition-transform duration-200 ${isMaterialsCollapsed ? '-rotate-90' : 'rotate-0'
+                          }`}
                       />
                     </div>
                   </div>
                 </div>
 
-              {!isMaterialsCollapsed && materialsList.length > 0 && (
-                <div className="space-y-2 animate-in fade-in duration-200">
-                  {materialsList.map((m, idx) => {
-                    const isChecked = checkedMaterials.has(idx);
-                    return (
-                      <div
-                        key={idx}
-                        onClick={() => toggleMaterial(idx)}
-                        className={`group flex items-start justify-between gap-3 p-3 rounded-2xl border transition-all cursor-pointer select-none ${isChecked
-                          ? 'bg-yarn-50/50 border-yarn-200 opacity-70'
-                          : 'bg-white border-yarn-200/90 hover:border-yarn-300 hover:shadow-2xs'
-                          }`}
-                      >
-                        <div className="flex items-start gap-3 min-w-0">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleMaterial(idx);
-                            }}
-                            className="mt-0.5 flex-shrink-0 text-yarn-700 hover:text-yarn-900 transition-colors"
-                          >
-                            {isChecked ? (
-                              <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600 fill-emerald-100" />
-                            ) : (
-                              <Circle className="w-4.5 h-4.5 text-yarn-400 group-hover:text-yarn-600" />
-                            )}
-                          </button>
+                {!isMaterialsCollapsed && materialsList.length > 0 && (
+                  <div className="space-y-2 animate-in fade-in duration-200">
+                    {materialsList.map((m, idx) => {
+                      const isChecked = checkedMaterials.has(idx);
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => toggleMaterial(idx)}
+                          className={`group flex items-start justify-between gap-3 p-3 rounded-2xl border transition-all cursor-pointer select-none ${isChecked
+                            ? 'bg-yarn-50/50 border-yarn-200 opacity-70'
+                            : 'bg-white border-yarn-200/90 hover:border-yarn-300 hover:shadow-2xs'
+                            }`}
+                        >
+                          <div className="flex items-start gap-3 min-w-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleMaterial(idx);
+                              }}
+                              className="mt-0.5 flex-shrink-0 text-yarn-700 hover:text-yarn-900 transition-colors"
+                            >
+                              {isChecked ? (
+                                <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600 fill-emerald-100" />
+                              ) : (
+                                <Circle className="w-4.5 h-4.5 text-yarn-400 group-hover:text-yarn-600" />
+                              )}
+                            </button>
 
-                          <div className="min-w-0">
+                            <div className="min-w-0">
+                              <span
+                                className={`text-xs sm:text-sm font-semibold leading-snug transition-colors ${isChecked ? 'line-through text-yarn-500' : 'text-yarn-900'
+                                  }`}
+                              >
+                                {m.name || (m as any).item}
+                              </span>
+                              {m.details && (
+                                <span className="block text-xs text-yarn-500 italic mt-0.5">
+                                  {m.details}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {m.quantity && (
                             <span
-                              className={`text-xs sm:text-sm font-semibold leading-snug transition-colors ${isChecked ? 'line-through text-yarn-500' : 'text-yarn-900'
+                              className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold shrink-0 transition-colors ${isChecked
+                                ? 'bg-yarn-100 text-yarn-600 border border-yarn-200'
+                                : 'bg-sage-100/90 text-sage-900 border border-sage-200'
                                 }`}
                             >
-                              {m.name || (m as any).item}
+                              {m.quantity}
                             </span>
-                            {m.details && (
-                              <span className="block text-xs text-yarn-500 italic mt-0.5">
-                                {m.details}
-                              </span>
-                            )}
-                          </div>
+                          )}
                         </div>
-
-                        {m.quantity && (
-                          <span
-                            className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold shrink-0 transition-colors ${isChecked
-                              ? 'bg-yarn-100 text-yarn-600 border border-yarn-200'
-                              : 'bg-sage-100/90 text-sage-900 border border-sage-200'
-                              }`}
-                          >
-                            {m.quantity}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ); })()}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Sectioned Checklist */}
           <div className="space-y-6">
@@ -1513,16 +1638,15 @@ export function ProjectDetailView({
                   return (
                     <div
                       key={group.groupTitle}
-                      className={`rounded-3xl bg-white border border-yarn-200 shadow-soft transition-all ${
-                        isCollapsed ? 'p-3.5 sm:p-5' : 'p-4 sm:p-6 lg:p-7 space-y-5 sm:space-y-6'
-                      }`}
+                      id={`section-group-${encodeURIComponent(group.groupTitle)}`}
+                      className={`rounded-3xl bg-white border border-yarn-200 shadow-soft transition-all scroll-mt-36 sm:scroll-mt-44 ${isCollapsed ? 'p-3.5 sm:p-5' : 'p-4 sm:p-6 lg:p-7 space-y-5 sm:space-y-6'
+                        }`}
                     >
                       {/* Master Multi-Part Header (e.g. Jambes, Bras, Oreilles) */}
                       <div
                         onClick={() => toggleSection(group.groupTitle, isGroupDone)}
-                        className={`flex items-center justify-between gap-2 min-w-0 cursor-pointer select-none transition-colors ${
-                          isCollapsed ? '' : 'border-b border-yarn-200/80 pb-3 sm:pb-4'
-                        }`}
+                        className={`flex items-center justify-between gap-2 min-w-0 cursor-pointer select-none transition-colors ${isCollapsed ? '' : 'border-b border-yarn-200/80 pb-3 sm:pb-4'
+                          }`}
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <Layers className="w-4 h-4 text-sage-700 shrink-0" />
@@ -1540,34 +1664,46 @@ export function ProjectDetailView({
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                          {group.completedCount < group.totalCount && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCheckSection(group.subSections.flatMap((s) => s.items), e);
+                              }}
+                              title={t.project.checkSection}
+                              className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-white hover:bg-emerald-50 border border-yarn-200 hover:border-emerald-300 text-emerald-700 font-bold text-xs shadow-2xs inline-flex items-center justify-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+                            >
+                              <CheckCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="hidden sm:inline">{t.project.checkSection}</span>
+                            </button>
+                          )}
                           {group.completedCount > 0 && (
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleResetMultipleSections(group.subSections.map((s) => s.rawSectionName || s.subTitle));
+                                handleResetSection(group.subSections.flatMap((s) => s.items));
                               }}
                               title={t.project.resetSection}
-                              className="p-1.5 rounded-xl text-yarn-400 hover:text-yarn-800 hover:bg-yarn-100 transition-colors flex items-center gap-1 text-xs"
+                              className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-white hover:bg-rose-50 border border-yarn-200 hover:border-rose-300 text-rose-600 hover:text-rose-700 font-bold text-xs shadow-2xs inline-flex items-center justify-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
                             >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline text-[11px]">{t.project.resetSection}</span>
+                              <RotateCcw className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                              <span className="hidden sm:inline">{t.project.resetSection}</span>
                             </button>
                           )}
                           <span
-                            className={`text-xs font-mono font-bold px-2.5 py-1 rounded-xl border ${
-                              isGroupDone
-                                ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                                : 'text-yarn-700 bg-yarn-50 border-yarn-200'
-                            }`}
+                            className={`text-xs font-mono font-bold px-2.5 py-1 rounded-xl border ${isGroupDone
+                              ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                              : 'text-yarn-700 bg-yarn-50 border-yarn-200'
+                              }`}
                           >
                             {group.completedCount} / {group.totalCount}
                           </span>
                           <ChevronDown
-                            className={`w-4 h-4 text-yarn-500 transition-transform duration-200 ${
-                              isCollapsed ? '-rotate-90' : 'rotate-0'
-                            }`}
+                            className={`w-4 h-4 text-yarn-500 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : 'rotate-0'
+                              }`}
                           />
                         </div>
                       </div>
@@ -1577,9 +1713,8 @@ export function ProjectDetailView({
                           {/* Multi-part micro-progress track */}
                           <div className="w-full h-1.5 bg-yarn-100 rounded-full overflow-hidden">
                             <div
-                              className={`h-full transition-all duration-300 rounded-full ${
-                                isGroupDone ? 'bg-emerald-500' : 'bg-sage-600'
-                              }`}
+                              className={`h-full transition-all duration-300 rounded-full ${isGroupDone ? 'bg-emerald-500' : 'bg-sage-600'
+                                }`}
                               style={{
                                 width: `${group.totalCount > 0 ? (group.completedCount / group.totalCount) * 100 : 0}%`,
                               }}
@@ -1598,34 +1733,50 @@ export function ProjectDetailView({
                                 >
                                   {/* Sub-Header (e.g. Jambe 1, Jambe 2) */}
                                   <div className="space-y-2 border-b border-yarn-200/60 pb-2.5">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2">
+                                    <div className="flex items-center justify-between gap-2 min-w-0">
+                                      <div className="flex items-center gap-2 min-w-0 flex-1">
                                         <span
-                                          className={`w-2 h-2 rounded-full ${
-                                            isSubDone ? 'bg-emerald-500' : 'bg-sage-600'
-                                          }`}
+                                          className={`w-2 h-2 rounded-full shrink-0 ${isSubDone ? 'bg-emerald-500' : 'bg-sage-600'
+                                            }`}
                                         />
-                                        <h3 className="text-sm font-bold font-serif text-yarn-900">
+                                        <h3 className="text-sm font-bold font-serif text-yarn-900 truncate">
                                           {sub.subTitle}
                                         </h3>
                                       </div>
-                                      <div className="flex items-center gap-1.5">
+
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        {!isSubDone && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleCheckSection(sub.items, e);
+                                            }}
+                                            title={t.project.checkSection}
+                                            className="h-7 px-2 rounded-lg bg-white hover:bg-emerald-50 border border-yarn-200 hover:border-emerald-300 text-emerald-700 font-bold text-[11px] inline-flex items-center gap-1 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap"
+                                          >
+                                            <CheckCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                            <span className="hidden xs:inline">{t.project.checkSection}</span>
+                                          </button>
+                                        )}
                                         {subCompleted > 0 && (
                                           <button
                                             type="button"
-                                            onClick={() => handleResetSection(sub.rawSectionName || sub.subTitle)}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleResetSection(sub.items);
+                                            }}
                                             title={t.project.resetSection}
-                                            className="p-1 rounded-md text-yarn-400 hover:text-yarn-800 hover:bg-white transition-colors"
+                                            className="h-7 w-7 rounded-lg bg-white hover:bg-rose-50 border border-yarn-200 hover:border-rose-300 text-rose-600 hover:text-rose-700 font-bold text-xs inline-flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-2xs shrink-0"
                                           >
-                                            <RotateCcw className="w-3 h-3" />
+                                            <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
                                           </button>
                                         )}
                                         <span
-                                          className={`text-xs font-mono font-bold px-2 py-0.5 rounded-lg border ${
-                                            isSubDone
-                                              ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                                              : 'text-yarn-600 bg-white border-yarn-200'
-                                          }`}
+                                          className={`h-7 px-2 text-xs font-mono font-bold rounded-lg border inline-flex items-center justify-center shrink-0 ${isSubDone
+                                            ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                            : 'text-yarn-600 bg-white border-yarn-200'
+                                            }`}
                                         >
                                           {subCompleted} / {sub.items.length}
                                         </span>
@@ -1635,9 +1786,8 @@ export function ProjectDetailView({
                                     {/* Sub-section micro-progress track */}
                                     <div className="w-full h-1 bg-yarn-200/80 rounded-full overflow-hidden">
                                       <div
-                                        className={`h-full transition-all duration-300 rounded-full ${
-                                          isSubDone ? 'bg-emerald-500' : 'bg-sage-600'
-                                        }`}
+                                        className={`h-full transition-all duration-300 rounded-full ${isSubDone ? 'bg-emerald-500' : 'bg-sage-600'
+                                          }`}
                                         style={{
                                           width: `${sub.items.length > 0 ? (subCompleted / sub.items.length) * 100 : 0}%`,
                                         }}
@@ -1651,15 +1801,14 @@ export function ProjectDetailView({
                                       <div
                                         key={item.id}
                                         onClick={(e) => {
-                                          if (editingItemId !== item.id && editingNoteId !== item.id) {
+                                          if (editingItemId !== item.id) {
                                             handleToggle(item.id, e);
                                           }
                                         }}
-                                        className={`group p-3 rounded-xl border transition-all cursor-pointer select-none ${
-                                          item.checked
-                                            ? 'bg-yarn-100/50 border-yarn-200 opacity-75'
-                                            : 'bg-white border-yarn-200 hover:border-yarn-300 hover:shadow-soft'
-                                        }`}
+                                        className={`group p-3 rounded-xl border transition-all cursor-pointer select-none ${item.checked
+                                          ? 'bg-yarn-100/50 border-yarn-200 opacity-75'
+                                          : 'bg-white border-yarn-200 hover:border-yarn-300 hover:shadow-soft'
+                                          }`}
                                       >
                                         <div className="flex items-start gap-2.5">
                                           <button
@@ -1681,105 +1830,80 @@ export function ProjectDetailView({
                                             {editingItemId === item.id ? (
                                               <div
                                                 onClick={(e) => e.stopPropagation()}
-                                                className="flex items-center gap-2"
+                                                className="space-y-2.5 p-3 rounded-2xl bg-yarn-50 border border-yarn-200"
                                               >
-                                                <input
-                                                  type="text"
-                                                  value={editLabel}
-                                                  onChange={(e) => setEditLabel(e.target.value)}
-                                                  className="w-full px-2.5 py-1 rounded-lg border border-yarn-300 text-xs focus:ring-2 focus:ring-sage-500 focus:outline-none"
-                                                />
-                                                <button
-                                                  type="button"
-                                                  onClick={() => handleSaveLabel(item.id)}
-                                                  className="p-1 rounded-md bg-sage-800 text-white hover:bg-sage-900"
-                                                >
-                                                  <Check className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => setEditingItemId(null)}
-                                                  className="p-1 rounded-md bg-yarn-200 text-yarn-800 hover:bg-yarn-300"
-                                                >
-                                                  <X className="w-3.5 h-3.5" />
-                                                </button>
-                                              </div>
-                                            ) : (
-                                              <div className="flex items-start justify-between gap-1.5">
-                                                <div
-                                                  className={`text-xs sm:text-sm font-medium leading-relaxed ${
-                                                    item.checked ? 'line-through text-yarn-500' : 'text-yarn-900'
-                                                  }`}
-                                                >
-                                                  {renderWithStitchTerms(item.label)}
+                                                <div>
+                                                  <label className="block text-[11px] font-bold text-yarn-700 mb-1">
+                                                    {t.project.editStepInstructionsLabel}
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    value={editLabel}
+                                                    onChange={(e) => setEditLabel(e.target.value)}
+                                                    className="w-full px-3 py-1.5 rounded-xl border border-yarn-300 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-sage-500 focus:outline-none bg-white text-yarn-900 shadow-2xs"
+                                                  />
                                                 </div>
 
-                                                <button
-                                                  type="button"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setEditingItemId(item.id);
-                                                    setEditLabel(item.label);
-                                                  }}
-                                                  title={t.project.editStep}
-                                                  className="opacity-0 group-hover:opacity-100 p-1 text-yarn-400 hover:text-yarn-700 transition-opacity"
-                                                >
-                                                  <Edit2 className="w-3 h-3" />
-                                                </button>
-                                              </div>
-                                            )}
+                                                <div>
+                                                  <label className="block text-[11px] font-bold text-yarn-700 mb-1">
+                                                    {t.project.editStepNoteLabel}
+                                                  </label>
+                                                  <input
+                                                    type="text"
+                                                    value={editNote}
+                                                    placeholder={t.project.notePlaceholder}
+                                                    onChange={(e) => setEditNote(e.target.value)}
+                                                    className="w-full px-3 py-1.5 rounded-xl border border-yarn-300 text-xs sm:text-sm focus:ring-2 focus:ring-sage-500 focus:outline-none bg-white text-yarn-800 shadow-2xs"
+                                                  />
+                                                </div>
 
-                                            {editingNoteId === item.id ? (
-                                              <div
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="mt-1.5 flex items-center gap-1.5"
-                                              >
-                                                <input
-                                                  type="text"
-                                                  value={editNote}
-                                                  placeholder={t.project.notePlaceholder}
-                                                  onChange={(e) => setEditNote(e.target.value)}
-                                                  className="w-full px-2.5 py-1 rounded-lg border border-yarn-300 text-xs focus:ring-2 focus:ring-sage-500 focus:outline-none"
-                                                />
-                                                <button
-                                                  type="button"
-                                                  onClick={() => handleSaveNote(item.id)}
-                                                  className="p-1 rounded-md bg-sage-800 text-white text-xs px-2"
-                                                >
-                                                  {t.project.saveStep}
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={() => setEditingNoteId(null)}
-                                                  className="p-1 rounded-md bg-yarn-200 text-yarn-800 text-xs px-2"
-                                                >
-                                                  {t.project.cancelEdit}
-                                                </button>
-                                              </div>
-                                            ) : isValidNote(item.note) ? (
-                                              <div
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setEditingNoteId(item.id);
-                                                  setEditNote(item.note || '');
-                                                }}
-                                                className="mt-1 text-[11px] text-sage-800 bg-sage-50 border border-sage-200 rounded-md px-2 py-0.5 inline-flex items-center gap-1 cursor-pointer hover:bg-sage-100 transition-colors"
-                                              >
-                                                <MessageSquare className="w-2.5 h-2.5 text-sage-600" />
-                                                <span>{item.note}</span>
+                                                <div className="flex items-center justify-end gap-2 pt-0.5">
+                                                  <button
+                                                    type="button"
+                                                    onClick={handleCancelEdit}
+                                                    className="px-3 py-1 rounded-lg border border-yarn-300 bg-white hover:bg-yarn-100 text-yarn-700 text-xs font-semibold transition-all cursor-pointer"
+                                                  >
+                                                    {t.project.cancelEdit}
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleSaveItem(item.id)}
+                                                    className="px-3 py-1 rounded-lg bg-sage-800 hover:bg-sage-900 text-white text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                                                  >
+                                                    {t.project.saveStep}
+                                                  </button>
+                                                </div>
                                               </div>
                                             ) : (
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setEditingNoteId(item.id);
-                                                  setEditNote('');
-                                                }}
-                                                className="mt-0.5 text-[10px] text-yarn-400 hover:text-yarn-700 opacity-0 group-hover:opacity-100 transition-opacity"
-                                              >
-                                                {t.project.addNote}
-                                              </button>
+                                              <>
+                                                <div className="flex items-start justify-between gap-1.5">
+                                                  <div
+                                                    className={`text-xs sm:text-sm font-medium leading-relaxed ${item.checked ? 'line-through text-yarn-500' : 'text-yarn-900'
+                                                      }`}
+                                                  >
+                                                    {renderWithStitchTerms(item.label)}
+                                                  </div>
+
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleStartEditItem(item);
+                                                    }}
+                                                    title={t.project.editStep}
+                                                    className="p-1 rounded-lg text-yarn-400 hover:text-yarn-700 hover:bg-yarn-100 active:bg-yarn-200 transition-colors shrink-0 cursor-pointer"
+                                                  >
+                                                    <Edit2 className="w-3.5 h-3.5" />
+                                                  </button>
+                                                </div>
+
+                                                {isValidNote(item.note) && (
+                                                  <div className="mt-1.5 text-[11px] sm:text-xs text-sage-900 bg-sage-50/90 border border-sage-200/80 rounded-xl px-2.5 py-1.5 flex items-start gap-1.5 w-fit max-w-full pointer-events-none">
+                                                    <MessageSquare className="w-3 h-3 text-sage-600 shrink-0 mt-0.5" />
+                                                    <span className="break-words leading-relaxed">{item.note}</span>
+                                                  </div>
+                                                )}
+                                              </>
                                             )}
                                           </div>
                                         </div>
@@ -1805,16 +1929,15 @@ export function ProjectDetailView({
                 return (
                   <div
                     key={group.groupTitle}
-                    className={`rounded-3xl bg-white border border-yarn-200 shadow-soft transition-all ${
-                      isCollapsed ? 'p-3.5 sm:p-5' : 'p-4 sm:p-6 lg:p-7 space-y-4 sm:space-y-5'
-                    }`}
+                    id={`section-group-${encodeURIComponent(group.groupTitle)}`}
+                    className={`rounded-3xl bg-white border border-yarn-200 shadow-soft transition-all scroll-mt-36 sm:scroll-mt-44 ${isCollapsed ? 'p-3.5 sm:p-5' : 'p-4 sm:p-6 lg:p-7 space-y-4 sm:space-y-5'
+                      }`}
                   >
                     {/* Section Header */}
                     <div
                       onClick={() => toggleSection(group.groupTitle, isDone)}
-                      className={`cursor-pointer select-none transition-colors ${
-                        isCollapsed ? '' : 'space-y-2.5 sm:space-y-3 border-b border-yarn-100 pb-2.5 sm:pb-3'
-                      }`}
+                      className={`cursor-pointer select-none transition-colors ${isCollapsed ? '' : 'space-y-2.5 sm:space-y-3 border-b border-yarn-100 pb-2.5 sm:pb-3'
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-2 min-w-0">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -1830,34 +1953,46 @@ export function ProjectDetailView({
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                          {group.completedCount < group.totalCount && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCheckSection(sub.items, e);
+                              }}
+                              title={t.project.checkSection}
+                              className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-white hover:bg-emerald-50 border border-yarn-200 hover:border-emerald-300 text-emerald-700 font-bold text-xs shadow-2xs inline-flex items-center justify-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+                            >
+                              <CheckCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="hidden sm:inline">{t.project.checkSection}</span>
+                            </button>
+                          )}
                           {group.completedCount > 0 && (
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleResetSection(sub.rawSectionName || group.groupTitle);
+                                handleResetSection(sub.items);
                               }}
                               title={t.project.resetSection}
-                              className="p-1 rounded-lg text-yarn-400 hover:text-yarn-800 hover:bg-yarn-100 transition-colors flex items-center gap-1 text-xs"
+                              className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-white hover:bg-rose-50 border border-yarn-200 hover:border-rose-300 text-rose-600 hover:text-rose-700 font-bold text-xs shadow-2xs inline-flex items-center justify-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer shrink-0"
                             >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline text-[11px]">{t.project.resetSection}</span>
+                              <RotateCcw className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                              <span className="hidden sm:inline">{t.project.resetSection}</span>
                             </button>
                           )}
                           <span
-                            className={`text-xs font-mono font-bold px-2 py-0.5 rounded-lg border ${
-                              isDone
-                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                                : 'text-yarn-600 bg-yarn-50 border-yarn-200'
-                            }`}
+                            className={`text-xs font-mono font-bold px-2 py-0.5 rounded-lg border ${isDone
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                              : 'text-yarn-600 bg-yarn-50 border-yarn-200'
+                              }`}
                           >
                             {group.completedCount} / {group.totalCount}
                           </span>
                           <ChevronDown
-                            className={`w-4 h-4 text-yarn-500 transition-transform duration-200 ${
-                              isCollapsed ? '-rotate-90' : 'rotate-0'
-                            }`}
+                            className={`w-4 h-4 text-yarn-500 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : 'rotate-0'
+                              }`}
                           />
                         </div>
                       </div>
@@ -1866,9 +2001,8 @@ export function ProjectDetailView({
                         /* Standalone section micro-progress track */
                         <div className="w-full h-1.5 bg-yarn-100 rounded-full overflow-hidden">
                           <div
-                            className={`h-full transition-all duration-300 rounded-full ${
-                              isDone ? 'bg-emerald-500' : 'bg-sage-600'
-                            }`}
+                            className={`h-full transition-all duration-300 rounded-full ${isDone ? 'bg-emerald-500' : 'bg-sage-600'
+                              }`}
                             style={{
                               width: `${group.totalCount > 0 ? (group.completedCount / group.totalCount) * 100 : 0}%`,
                             }}
@@ -1884,15 +2018,14 @@ export function ProjectDetailView({
                           <div
                             key={item.id}
                             onClick={(e) => {
-                              if (editingItemId !== item.id && editingNoteId !== item.id) {
+                              if (editingItemId !== item.id) {
                                 handleToggle(item.id, e);
                               }
                             }}
-                            className={`group p-3.5 rounded-2xl border transition-all cursor-pointer select-none ${
-                              item.checked
-                                ? 'bg-yarn-50/50 border-yarn-200 opacity-75'
-                                : 'bg-white border-yarn-200 hover:border-yarn-300 hover:shadow-soft'
-                            }`}
+                            className={`group p-3.5 rounded-2xl border transition-all cursor-pointer select-none ${item.checked
+                              ? 'bg-yarn-50/50 border-yarn-200 opacity-75'
+                              : 'bg-white border-yarn-200 hover:border-yarn-300 hover:shadow-soft'
+                              }`}
                           >
                             <div className="flex items-start gap-3">
                               <button
@@ -1914,105 +2047,80 @@ export function ProjectDetailView({
                                 {editingItemId === item.id ? (
                                   <div
                                     onClick={(e) => e.stopPropagation()}
-                                    className="flex items-center gap-2"
+                                    className="space-y-2.5 p-3 rounded-2xl bg-yarn-50 border border-yarn-200"
                                   >
-                                    <input
-                                      type="text"
-                                      value={editLabel}
-                                      onChange={(e) => setEditLabel(e.target.value)}
-                                      className="w-full px-3 py-1.5 rounded-xl border border-yarn-300 text-sm focus:ring-2 focus:ring-sage-500 focus:outline-none"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSaveLabel(item.id)}
-                                      className="p-1.5 rounded-lg bg-sage-800 text-white hover:bg-sage-900"
-                                    >
-                                      <Check className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditingItemId(null)}
-                                      className="p-1.5 rounded-lg bg-yarn-200 text-yarn-800 hover:bg-yarn-300"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div
-                                      className={`text-sm font-medium leading-relaxed ${
-                                        item.checked ? 'line-through text-yarn-500' : 'text-yarn-900'
-                                      }`}
-                                    >
-                                      {renderWithStitchTerms(item.label)}
+                                    <div>
+                                      <label className="block text-[11px] font-bold text-yarn-700 mb-1">
+                                        {t.project.editStepInstructionsLabel}
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={editLabel}
+                                        onChange={(e) => setEditLabel(e.target.value)}
+                                        className="w-full px-3 py-1.5 rounded-xl border border-yarn-300 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-sage-500 focus:outline-none bg-white text-yarn-900 shadow-2xs"
+                                      />
                                     </div>
 
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingItemId(item.id);
-                                        setEditLabel(item.label);
-                                      }}
-                                      title={t.project.editStep}
-                                      className="opacity-0 group-hover:opacity-100 p-1 text-yarn-400 hover:text-yarn-700 transition-opacity"
-                                    >
-                                      <Edit2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                )}
+                                    <div>
+                                      <label className="block text-[11px] font-bold text-yarn-700 mb-1">
+                                        {t.project.editStepNoteLabel}
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={editNote}
+                                        placeholder={t.project.notePlaceholder}
+                                        onChange={(e) => setEditNote(e.target.value)}
+                                        className="w-full px-3 py-1.5 rounded-xl border border-yarn-300 text-xs sm:text-sm focus:ring-2 focus:ring-sage-500 focus:outline-none bg-white text-yarn-800 shadow-2xs"
+                                      />
+                                    </div>
 
-                                {editingNoteId === item.id ? (
-                                  <div
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="mt-2 flex items-center gap-2"
-                                  >
-                                    <input
-                                      type="text"
-                                      value={editNote}
-                                      placeholder={t.project.notePlaceholder}
-                                      onChange={(e) => setEditNote(e.target.value)}
-                                      className="w-full px-3 py-1 rounded-xl border border-yarn-300 text-xs focus:ring-2 focus:ring-sage-500 focus:outline-none"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSaveNote(item.id)}
-                                      className="p-1 rounded-lg bg-sage-800 text-white text-xs px-2"
-                                    >
-                                      {t.project.saveStep}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditingNoteId(null)}
-                                      className="p-1 rounded-md bg-yarn-200 text-yarn-800 text-xs px-2"
-                                    >
-                                      {t.project.cancelEdit}
-                                    </button>
-                                  </div>
-                                ) : isValidNote(item.note) ? (
-                                  <div
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingNoteId(item.id);
-                                      setEditNote(item.note || '');
-                                    }}
-                                    className="mt-1 text-[11px] text-sage-800 bg-sage-50 border border-sage-200 rounded-md px-2 py-0.5 inline-flex items-center gap-1 cursor-pointer hover:bg-sage-100 transition-colors"
-                                  >
-                                    <MessageSquare className="w-2.5 h-2.5 text-sage-600" />
-                                    <span>{item.note}</span>
+                                    <div className="flex items-center justify-end gap-2 pt-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={handleCancelEdit}
+                                        className="px-3 py-1 rounded-lg border border-yarn-300 bg-white hover:bg-yarn-100 text-yarn-700 text-xs font-semibold transition-all cursor-pointer"
+                                      >
+                                        {t.project.cancelEdit}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSaveItem(item.id)}
+                                        className="px-3 py-1 rounded-lg bg-sage-800 hover:bg-sage-900 text-white text-xs font-bold shadow-2xs transition-all cursor-pointer"
+                                      >
+                                        {t.project.saveStep}
+                                      </button>
+                                    </div>
                                   </div>
                                 ) : (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingNoteId(item.id);
-                                      setEditNote('');
-                                    }}
-                                    className="mt-0.5 text-[10px] text-yarn-400 hover:text-yarn-700 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  >
-                                    {t.project.addNote}
-                                  </button>
+                                  <>
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div
+                                        className={`text-sm font-medium leading-relaxed ${item.checked ? 'line-through text-yarn-500' : 'text-yarn-900'
+                                          }`}
+                                      >
+                                        {renderWithStitchTerms(item.label)}
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleStartEditItem(item);
+                                        }}
+                                        title={t.project.editStep}
+                                        className="p-1 rounded-lg text-yarn-400 hover:text-yarn-700 hover:bg-yarn-100 active:bg-yarn-200 transition-colors shrink-0 cursor-pointer"
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+
+                                    {isValidNote(item.note) && (
+                                      <div className="mt-1.5 text-[11px] sm:text-xs text-sage-900 bg-sage-50/90 border border-sage-200/80 rounded-xl px-2.5 py-1.5 flex items-start gap-1.5 w-fit max-w-full pointer-events-none">
+                                        <MessageSquare className="w-3 h-3 text-sage-600 shrink-0 mt-0.5" />
+                                        <span className="break-words leading-relaxed">{item.note}</span>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </div>
@@ -2030,9 +2138,8 @@ export function ProjectDetailView({
         {/* Desktop Side-by-Side PDF / Image / Text Viewer (50% on Desktop, hidden on Mobile) */}
         {hasOriginalDocument && (
           <div
-            className={`hidden ${
-              showOriginal ? 'lg:flex' : 'lg:hidden'
-            } w-full lg:h-[calc(100vh-160px)] lg:sticky lg:top-[140px] z-20 rounded-3xl bg-white border border-yarn-300 shadow-lift overflow-hidden flex-col animate-in fade-in duration-200`}
+            className={`hidden ${showOriginal ? 'lg:flex' : 'lg:hidden'
+              } w-full lg:h-[calc(100vh-160px)] lg:sticky lg:top-[140px] z-20 rounded-3xl bg-white border border-yarn-300 shadow-lift overflow-hidden flex-col animate-in fade-in duration-200`}
           >
             <div className="p-4 border-b border-yarn-200 bg-yarn-50 flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-yarn-800">
@@ -2041,8 +2148,8 @@ export function ProjectDetailView({
                   {tutorial.source_type === 'pdf'
                     ? t.project.originalPdf
                     : tutorial.source_type === 'text'
-                    ? t.project.originalText
-                    : t.project.originalImages}
+                      ? t.project.originalText
+                      : t.project.originalImages}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -2124,23 +2231,20 @@ export function ProjectDetailView({
       {/* Mobile Slide-Up Bottom Sheet Drawer (Retains PDF page & scroll position permanently) */}
       {hasOriginalDocument && (
         <div
-          className={`lg:hidden fixed inset-0 z-50 flex flex-col justify-end transition-all duration-300 ${
-            showOriginal ? 'opacity-100 pointer-events-auto visible' : 'opacity-0 pointer-events-none invisible'
-          }`}
+          className={`lg:hidden fixed inset-0 z-50 flex flex-col justify-end transition-all duration-300 ${showOriginal ? 'opacity-100 pointer-events-auto visible' : 'opacity-0 pointer-events-none invisible'
+            }`}
         >
           {/* Backdrop with blur */}
           <div
-            className={`fixed inset-0 bg-yarn-950/60 backdrop-blur-sm transition-opacity duration-300 ${
-              showOriginal ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`fixed inset-0 bg-yarn-950/60 backdrop-blur-sm transition-opacity duration-300 ${showOriginal ? 'opacity-100' : 'opacity-0'
+              }`}
             onClick={() => setShowOriginal(false)}
           />
 
           {/* Sheet Modal Container */}
           <div
-            className={`relative w-full h-[88vh] max-h-[88vh] bg-white rounded-t-3xl border-t border-yarn-300 shadow-2xl flex flex-col overflow-hidden z-10 transition-transform duration-300 ease-out ${
-              showOriginal ? 'translate-y-0' : 'translate-y-full'
-            }`}
+            className={`relative w-full h-[88vh] max-h-[88vh] bg-white rounded-t-3xl border-t border-yarn-300 shadow-2xl flex flex-col overflow-hidden z-10 transition-transform duration-300 ease-out ${showOriginal ? 'translate-y-0' : 'translate-y-full'
+              }`}
           >
             {/* Grab Handle */}
             <div className="pt-2.5 pb-1 flex justify-center bg-yarn-50">
@@ -2155,8 +2259,8 @@ export function ProjectDetailView({
                   {tutorial.source_type === 'pdf'
                     ? t.project.originalPdf
                     : tutorial.source_type === 'text'
-                    ? t.project.originalText
-                    : t.project.originalImages}
+                      ? t.project.originalText
+                      : t.project.originalImages}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -2255,13 +2359,12 @@ export function ProjectDetailView({
       {translationToast && (
         <div className="fixed bottom-6 right-6 z-50 animate-bounce-short pointer-events-auto">
           <div
-            className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-lift text-xs font-bold border backdrop-blur-xl ${
-              translationToast.type === 'success'
-                ? 'bg-sage-900/95 text-white border-sage-700 shadow-sage-900/30'
-                : translationToast.type === 'info'
+            className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-lift text-xs font-bold border backdrop-blur-xl ${translationToast.type === 'success'
+              ? 'bg-sage-900/95 text-white border-sage-700 shadow-sage-900/30'
+              : translationToast.type === 'info'
                 ? 'bg-yarn-900/95 text-white border-yarn-700 shadow-yarn-900/30'
                 : 'bg-red-900/95 text-white border-red-700 shadow-red-900/30'
-            }`}
+              }`}
           >
             {translationToast.type === 'success' ? (
               <Sparkles className="w-4 h-4 text-sage-300" />
@@ -2275,108 +2378,115 @@ export function ProjectDetailView({
         </div>
       )}
 
-      {/* Edit Project Details Modal */}
+      {/* Edit Project Details Modal / Mobile Drawer */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+          {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-yarn-950/60 backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 bg-yarn-950/60 backdrop-blur-md animate-backdrop-fade transition-opacity"
             onClick={() => !isSavingDetails && setIsEditModalOpen(false)}
           />
 
-          <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 sm:p-7 shadow-lift border border-yarn-200 z-10 space-y-5 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-yarn-100 pb-3">
-              <div>
-                <h3 className="text-lg font-bold font-serif text-yarn-950">
-                  {t.project.editDetailsTitle}
-                </h3>
-                <p className="text-xs text-yarn-500 mt-0.5">
-                  {t.project.editDetailsDesc}
-                </p>
+          {/* Drawer on Mobile / Modal on Desktop */}
+          <div className="relative w-full sm:max-w-lg max-h-[92vh] sm:max-h-[85vh] bg-white rounded-t-[28px] sm:rounded-3xl border-t sm:border border-yarn-200 shadow-2xl overflow-hidden flex flex-col z-10 animate-drawer-slide-up sm:animate-modal-zoom">
+            {/* Header */}
+            <div className="p-4 sm:p-6 border-b border-yarn-100 bg-gradient-to-br from-yarn-50 via-white to-sage-50/40 shrink-0">
+              {/* Mobile Handle Bar */}
+              <div className="w-10 h-1 rounded-full bg-yarn-300 mx-auto mb-3 sm:hidden shrink-0" />
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-sage-100 border border-sage-200 flex items-center justify-center text-sage-800 shrink-0 shadow-2xs">
+                    <Edit2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-xl font-bold font-serif text-yarn-950">
+                      {t.project.editDetailsTitle}
+                    </h3>
+                    <p className="text-xs text-yarn-500 mt-0.5">
+                      {t.project.editDetailsDesc}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => !isSavingDetails && setIsEditModalOpen(false)}
+                  className="w-9 h-9 rounded-xl bg-yarn-100 hover:bg-yarn-200 text-yarn-700 hover:text-yarn-950 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => !isSavingDetails && setIsEditModalOpen(false)}
-                className="p-1.5 rounded-xl text-yarn-400 hover:text-yarn-700 hover:bg-yarn-100 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
 
-            <form onSubmit={handleSaveDetails} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-yarn-900">
-                  {t.project.titleLabel} *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editTitleInput}
-                  onChange={(e) => setEditTitleInput(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs font-semibold"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-yarn-900">
-                  {t.project.descriptionLabel}
-                </label>
-                <textarea
-                  rows={4}
-                  value={editNoteInput}
-                  onChange={(e) => setEditNoteInput(e.target.value)}
-                  placeholder={t.project.descriptionPlaceholder}
-                  className="w-full p-3.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs placeholder:text-yarn-400"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Custom Category Dropdown */}
-                <div className="space-y-1.5 relative">
-                  <label className="text-xs font-bold text-yarn-900 flex items-center gap-1.5">
-                    <CategoryIcon
-                      category={editProjectTypeInput}
-                      className={`w-3.5 h-3.5 ${editProjectTypeInput ? getCategoryStyle(editProjectTypeInput).iconColor : 'text-sage-700'}`}
-                    />
-                    <span>{t.project.categoryLabel || 'Catégorie'}</span>
+            {/* Scrollable Form Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+              <form id="edit-project-form" onSubmit={handleSaveDetails} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-yarn-900">
+                    {t.project.titleLabel} *
                   </label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowEditLevelDropdown(false);
-                        setShowEditCategoryDropdown((prev) => !prev);
-                      }}
-                      className={`w-full inline-flex items-center justify-between gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
-                        editProjectTypeInput
+                  <input
+                    type="text"
+                    required
+                    value={editTitleInput}
+                    onChange={(e) => setEditTitleInput(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs font-semibold"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-yarn-900">
+                    {t.project.descriptionLabel}
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={editNoteInput}
+                    onChange={(e) => setEditNoteInput(e.target.value)}
+                    placeholder={t.project.descriptionPlaceholder}
+                    className="w-full p-3.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs placeholder:text-yarn-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Custom Category Dropdown */}
+                  <div ref={editCategoryDropdownRef} className="space-y-1.5 relative">
+                    <label className="text-xs font-bold text-yarn-900 flex items-center gap-1.5">
+                      <CategoryIcon
+                        category={editProjectTypeInput}
+                        className={`w-3.5 h-3.5 ${editProjectTypeInput ? getCategoryStyle(editProjectTypeInput).iconColor : 'text-sage-700'}`}
+                      />
+                      <span>{t.project.categoryLabel || 'Catégorie'}</span>
+                    </label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowEditLevelDropdown(false);
+                          setShowEditCategoryDropdown((prev) => !prev);
+                        }}
+                        className={`w-full inline-flex items-center justify-between gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${editProjectTypeInput
                           ? `${getCategoryStyle(editProjectTypeInput).badgeClass} shadow-xs`
                           : 'bg-white text-yarn-800 hover:bg-yarn-50 border-yarn-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <CategoryIcon
-                          category={editProjectTypeInput}
-                          className={`w-3.5 h-3.5 shrink-0 ${editProjectTypeInput ? getCategoryStyle(editProjectTypeInput).iconColor : 'text-sage-700'}`}
-                        />
-                        <span className="truncate">
-                          {!editProjectTypeInput
-                            ? (t.library.filterCategoryAll || 'Non spécifié')
-                            : (t.project.projectTypes as any)?.[editProjectTypeInput.toLowerCase()] || editProjectTypeInput}
-                        </span>
-                      </div>
-                      <ChevronDown className="w-3.5 h-3.5 text-yarn-500 shrink-0 ml-1" />
-                    </button>
+                          }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <CategoryIcon
+                            category={editProjectTypeInput}
+                            className={`w-3.5 h-3.5 shrink-0 ${editProjectTypeInput ? getCategoryStyle(editProjectTypeInput).iconColor : 'text-sage-700'}`}
+                          />
+                          <span className="truncate">
+                            {!editProjectTypeInput
+                              ? (t.library.filterCategoryAll || 'Non spécifié')
+                              : (t.project.projectTypes as any)?.[editProjectTypeInput.toLowerCase()] || editProjectTypeInput}
+                          </span>
+                        </div>
+                        <ChevronDown className="w-3.5 h-3.5 text-yarn-500 shrink-0 ml-1" />
+                      </button>
 
-                    {showEditCategoryDropdown && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40 bg-transparent"
-                          onClick={() => setShowEditCategoryDropdown(false)}
-                        />
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute left-0 mt-1.5 w-full rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn"
-                        >
+                      {showEditCategoryDropdown && (
+                        <div className="absolute left-0 mt-1.5 w-full rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn">
                           <div className="space-y-0.5 max-h-56 overflow-y-auto">
                             {EDIT_CATEGORY_OPTIONS.map((opt) => {
                               const isSelected = (editProjectTypeInput || '').toLowerCase() === opt.key.toLowerCase();
@@ -2389,9 +2499,8 @@ export function ProjectDetailView({
                                     setEditProjectTypeInput(opt.key);
                                     setShowEditCategoryDropdown(false);
                                   }}
-                                  className={`w-full text-left px-2.5 py-2 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
-                                    isSelected ? `font-bold text-yarn-950 ${optStyle.activeBg}` : 'text-yarn-800 hover:bg-yarn-50'
-                                  }`}
+                                  className={`w-full text-left px-2.5 py-2 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${isSelected ? `font-bold text-yarn-950 ${optStyle.activeBg}` : 'text-yarn-800 hover:bg-yarn-50'
+                                    }`}
                                 >
                                   <div className="flex items-center gap-2 truncate">
                                     <CategoryIcon
@@ -2406,55 +2515,52 @@ export function ProjectDetailView({
                             })}
                           </div>
                         </div>
-                      </>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Custom Level Dropdown */}
-                <div className="space-y-1.5 relative">
-                  <label className="text-xs font-bold text-yarn-900 flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5 text-sage-700" />
-                    <span>{t.project.levelLabel || 'Niveau'}</span>
-                  </label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowEditCategoryDropdown(false);
-                        setShowEditLevelDropdown((prev) => !prev);
-                      }}
-                      className={`w-full inline-flex items-center justify-between gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
-                        editLevelInput
-                          ? 'bg-sage-50 text-sage-900 border-sage-300 shadow-xs'
+                  {/* Custom Level Dropdown */}
+                  <div ref={editLevelDropdownRef} className="space-y-1.5 relative">
+                    <label className="text-xs font-bold text-yarn-900 flex items-center gap-1.5">
+                      <LevelIcon
+                        level={editLevelInput}
+                        className={`w-3.5 h-3.5 ${editLevelInput ? getLevelStyle(editLevelInput).iconColor : 'text-sage-700'}`}
+                      />
+                      <span>{t.project.levelLabel || 'Niveau'}</span>
+                    </label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowEditCategoryDropdown(false);
+                          setShowEditLevelDropdown((prev) => !prev);
+                        }}
+                        className={`w-full inline-flex items-center justify-between gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${editLevelInput
+                          ? `${getLevelStyle(editLevelInput).badgeClass} shadow-xs`
                           : 'bg-white text-yarn-800 hover:bg-yarn-50 border-yarn-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <Layers className="w-3.5 h-3.5 text-sage-700 shrink-0" />
-                        <span className="truncate">
-                          {!editLevelInput
-                            ? (t.library.allLevels || 'Non spécifié')
-                            : (t.project.levels as any)?.[editLevelInput.toLowerCase()] || editLevelInput}
-                        </span>
-                      </div>
-                      <ChevronDown className="w-3.5 h-3.5 text-yarn-500 shrink-0 ml-1" />
-                    </button>
+                          }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <LevelIcon
+                            level={editLevelInput}
+                            className={`w-3.5 h-3.5 shrink-0 ${editLevelInput ? getLevelStyle(editLevelInput).iconColor : 'text-sage-700'}`}
+                          />
+                          <span className="truncate">
+                            {!editLevelInput
+                              ? (t.library.allLevels || 'Non spécifié')
+                              : (t.project.levels as any)?.[editLevelInput.toLowerCase()] || editLevelInput}
+                          </span>
+                        </div>
+                        <ChevronDown className="w-3.5 h-3.5 text-yarn-500 shrink-0 ml-1" />
+                      </button>
 
-                    {showEditLevelDropdown && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40 bg-transparent"
-                          onClick={() => setShowEditLevelDropdown(false)}
-                        />
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute left-0 mt-1.5 w-full rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn"
-                        >
+                      {showEditLevelDropdown && (
+                        <div className="absolute left-0 mt-1.5 w-full rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn">
                           <div className="space-y-0.5 max-h-56 overflow-y-auto">
                             {EDIT_LEVEL_OPTIONS.map((opt) => {
                               const isSelected = (editLevelInput || '').toLowerCase() === opt.key.toLowerCase();
+                              const optStyle = getLevelStyle(opt.key);
                               return (
                                 <button
                                   key={opt.key}
@@ -2463,66 +2569,73 @@ export function ProjectDetailView({
                                     setEditLevelInput(opt.key);
                                     setShowEditLevelDropdown(false);
                                   }}
-                                  className={`w-full text-left px-2.5 py-2 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
-                                    isSelected ? 'font-bold text-sage-900 bg-sage-50' : 'text-yarn-800 hover:bg-yarn-50'
-                                  }`}
+                                  className={`w-full text-left px-2.5 py-2 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${isSelected ? `font-bold text-yarn-950 ${optStyle.activeBg}` : 'text-yarn-800 hover:bg-yarn-50'
+                                    }`}
                                 >
-                                  <span>{opt.label}</span>
+                                  <div className="flex items-center gap-2 truncate">
+                                    <LevelIcon
+                                      level={opt.key}
+                                      className={`w-3.5 h-3.5 shrink-0 ${optStyle.iconColor}`}
+                                    />
+                                    <span className="truncate">{opt.label}</span>
+                                  </div>
                                   {isSelected && <Check className="w-3.5 h-3.5 text-sage-700 shrink-0 ml-1.5" />}
                                 </button>
                               );
                             })}
                           </div>
                         </div>
-                      </>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Hook Size */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-yarn-900 flex items-center gap-1.5">
-                  <Volleyball className="w-3.5 h-3.5 text-sage-700" />
-                  <span>{t.project.hookLabel}</span>
-                </label>
-                <input
-                  type="text"
-                  value={editStitchInput}
-                  onChange={(e) => setEditStitchInput(e.target.value)}
-                  placeholder="Ex: 3.5 mm"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs"
-                />
-              </div>
+                {/* Hook Size */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-yarn-900 flex items-center gap-1.5">
+                    <Volleyball className="w-3.5 h-3.5 text-sage-700" />
+                    <span>{t.project.hookLabel}</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editStitchInput}
+                    onChange={(e) => setEditStitchInput(e.target.value)}
+                    placeholder="Ex: 3.5 mm"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs"
+                  />
+                </div>
+              </form>
+            </div>
 
-              <div className="pt-3 border-t border-yarn-100 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  disabled={isSavingDetails}
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-yarn-700 hover:bg-yarn-100 border border-yarn-200 transition-colors"
-                >
-                  {t.project.cancelEdit}
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingDetails || !editTitleInput.trim()}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-sage-800 hover:bg-sage-900 disabled:opacity-50 transition-all shadow-soft"
-                >
-                  {isSavingDetails ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>{t.project.savingDetails}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>{t.project.saveDetails}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+            {/* Sticky Footer Actions */}
+            <div className="p-4 sm:p-6 border-t border-yarn-100 bg-yarn-50/50 flex items-center justify-end gap-2.5 shrink-0">
+              <button
+                type="button"
+                disabled={isSavingDetails}
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-yarn-700 hover:bg-yarn-100 border border-yarn-200 transition-colors cursor-pointer"
+              >
+                {t.project.cancelEdit}
+              </button>
+              <button
+                type="submit"
+                form="edit-project-form"
+                disabled={isSavingDetails || !editTitleInput.trim()}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-sage-800 hover:bg-sage-900 disabled:opacity-50 transition-all shadow-soft cursor-pointer"
+              >
+                {isSavingDetails ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>{t.project.savingDetails}</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{t.project.saveDetails}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2562,6 +2675,12 @@ export function ProjectDetailView({
           </div>
         </div>
       )}
+
+      {/* Glossary Modal */}
+      <GlossaryModal
+        isOpen={showGlossaryModal}
+        onClose={() => setShowGlossaryModal(false)}
+      />
     </div>
   );
 }

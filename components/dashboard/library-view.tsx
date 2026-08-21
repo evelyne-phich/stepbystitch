@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Plus, Search, BookOpen, CheckCircle2, Sparkles, Circle, Check, ChevronDown, Layers, Tag } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/context';
 import { CategoryBadge, CategoryIcon, getCategoryStyle } from '@/components/ui/category-icon';
+import { LevelBadge, LevelIcon, getLevelStyle } from '@/components/ui/level-icon';
 import type { TutorialWithProgress } from '@/lib/types/database';
 
 interface LibraryViewProps {
@@ -22,6 +23,28 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [showLevelDropdown, setShowLevelDropdown] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+
+  const levelDropdownRef = useRef<HTMLDivElement>(null);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (levelDropdownRef.current && !levelDropdownRef.current.contains(target)) {
+        setShowLevelDropdown(false);
+      }
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(target)) {
+        setShowCategoryDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
 
   const LEVEL_OPTIONS = [
     { key: 'all', label: t.library.filterLevelAll },
@@ -174,29 +197,31 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.library.searchPlaceholder}
-              className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-yarn-200 bg-white text-sm text-yarn-900 placeholder:text-yarn-400 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-soft"
+              className="w-full pl-10 pr-4 h-10 rounded-2xl border border-yarn-200 bg-white text-sm text-yarn-900 placeholder:text-yarn-400 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-soft"
             />
           </div>
 
           {/* Dropdown Filters (Level + Category) */}
           <div className="flex items-center gap-2 shrink-0">
             {/* Custom Level Filter Dropdown */}
-            <div className="relative flex-1 sm:flex-initial">
+            <div ref={levelDropdownRef} className="relative flex-1 sm:flex-initial">
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
+                onClick={() => {
                   setShowCategoryDropdown(false);
                   setShowLevelDropdown((prev) => !prev);
                 }}
-                className={`w-full sm:w-auto inline-flex items-center justify-between sm:justify-start gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer ${
+                className={`w-full sm:w-auto h-10 inline-flex items-center justify-between sm:justify-start gap-1.5 px-3.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer ${
                   filterLevel !== 'all'
-                    ? 'bg-sage-100 text-sage-900 border-sage-300 shadow-xs'
+                    ? `${getLevelStyle(filterLevel).badgeClass} shadow-xs`
                     : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
                 }`}
               >
                 <div className="flex items-center gap-1.5 truncate">
-                  <Layers className="w-3.5 h-3.5 text-sage-700 shrink-0" />
+                  <LevelIcon
+                    level={filterLevel !== 'all' ? filterLevel : null}
+                    className={`w-3.5 h-3.5 shrink-0 ${filterLevel !== 'all' ? getLevelStyle(filterLevel).iconColor : 'text-sage-700'}`}
+                  />
                   <span className="truncate">
                     {filterLevel === 'all'
                       ? t.library.filterLevelAll
@@ -207,54 +232,51 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
               </button>
 
               {showLevelDropdown && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40 bg-transparent"
-                    onClick={() => setShowLevelDropdown(false)}
-                  />
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute left-0 mt-2 w-full sm:w-48 rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn"
-                  >
-                    <div className="px-2.5 py-1 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
-                      {t.project.levelLabel || 'Niveau'}
-                    </div>
-                    <div className="space-y-0.5 max-h-64 overflow-y-auto">
-                      {LEVEL_OPTIONS.map((opt) => {
-                        const isSelected = filterLevel === opt.key;
-                        return (
-                          <button
-                            key={opt.key}
-                            type="button"
-                            onClick={() => {
-                              setFilterLevel(opt.key as any);
-                              setShowLevelDropdown(false);
-                            }}
-                            className={`w-full text-left px-2.5 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
-                              isSelected ? 'font-bold text-sage-900 bg-sage-50' : 'text-yarn-800 hover:bg-yarn-50'
-                            }`}
-                          >
-                            <span>{opt.label}</span>
-                            {isSelected && <Check className="w-3.5 h-3.5 text-sage-700 shrink-0 ml-1.5" />}
-                          </button>
-                        );
-                      })}
-                    </div>
+                <div className="absolute left-0 mt-2 w-full sm:w-48 rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn">
+                  <div className="px-2.5 py-1 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
+                    {t.project.levelLabel || 'Niveau'}
                   </div>
-                </>
+                  <div className="space-y-0.5 max-h-64 overflow-y-auto">
+                    {LEVEL_OPTIONS.map((opt) => {
+                      const isSelected = filterLevel === opt.key;
+                      const optStyle = getLevelStyle(opt.key !== 'all' ? opt.key : null);
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => {
+                            setFilterLevel(opt.key as any);
+                            setShowLevelDropdown(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
+                            isSelected ? `font-bold text-yarn-950 ${optStyle.activeBg}` : 'text-yarn-800 hover:bg-yarn-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <LevelIcon
+                              level={opt.key !== 'all' ? opt.key : null}
+                              className={`w-3.5 h-3.5 shrink-0 ${optStyle.iconColor}`}
+                            />
+                            <span className="truncate">{opt.label}</span>
+                          </div>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-sage-700 shrink-0 ml-1.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
 
             {/* Custom Category / Project Type Filter Dropdown */}
-            <div className="relative flex-1 sm:flex-initial">
+            <div ref={categoryDropdownRef} className="relative flex-1 sm:flex-initial">
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
+                onClick={() => {
                   setShowLevelDropdown(false);
                   setShowCategoryDropdown((prev) => !prev);
                 }}
-                className={`w-full sm:w-auto inline-flex items-center justify-between sm:justify-start gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer ${
+                className={`w-full sm:w-auto h-10 inline-flex items-center justify-between sm:justify-start gap-1.5 px-3.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer ${
                   filterCategory !== 'all'
                     ? `${getCategoryStyle(filterCategory).badgeClass} shadow-xs`
                     : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
@@ -275,48 +297,39 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
               </button>
 
               {showCategoryDropdown && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40 bg-transparent"
-                    onClick={() => setShowCategoryDropdown(false)}
-                  />
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-full sm:w-52 rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn"
-                  >
-                    <div className="px-2.5 py-1 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
-                      {t.library.filterCategoryLabel || 'Catégorie'}
-                    </div>
-                    <div className="space-y-0.5 max-h-64 overflow-y-auto">
-                      {CATEGORY_OPTIONS.map((opt) => {
-                        const isSelected = filterCategory === opt.key;
-                        const optStyle = getCategoryStyle(opt.key !== 'all' ? opt.key : null);
-                        return (
-                          <button
-                            key={opt.key}
-                            type="button"
-                            onClick={() => {
-                              setFilterCategory(opt.key);
-                              setShowCategoryDropdown(false);
-                            }}
-                            className={`w-full text-left px-2.5 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
-                              isSelected ? `font-bold text-yarn-950 ${optStyle.activeBg}` : 'text-yarn-800 hover:bg-yarn-50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 truncate">
-                              <CategoryIcon
-                                category={opt.key !== 'all' ? opt.key : null}
-                                className={`w-3.5 h-3.5 shrink-0 ${optStyle.iconColor}`}
-                              />
-                              <span className="truncate">{opt.label}</span>
-                            </div>
-                            {isSelected && <Check className="w-3.5 h-3.5 text-sage-700 shrink-0 ml-1.5" />}
-                          </button>
-                        );
-                      })}
-                    </div>
+                <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-full sm:w-52 rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn">
+                  <div className="px-2.5 py-1 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
+                    {t.library.filterCategoryLabel || 'Catégorie'}
                   </div>
-                </>
+                  <div className="space-y-0.5 max-h-64 overflow-y-auto">
+                    {CATEGORY_OPTIONS.map((opt) => {
+                      const isSelected = filterCategory === opt.key;
+                      const optStyle = getCategoryStyle(opt.key !== 'all' ? opt.key : null);
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => {
+                            setFilterCategory(opt.key);
+                            setShowCategoryDropdown(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
+                            isSelected ? `font-bold text-yarn-950 ${optStyle.activeBg}` : 'text-yarn-800 hover:bg-yarn-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <CategoryIcon
+                              category={opt.key !== 'all' ? opt.key : null}
+                              className={`w-3.5 h-3.5 shrink-0 ${optStyle.iconColor}`}
+                            />
+                            <span className="truncate">{opt.label}</span>
+                          </div>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-sage-700 shrink-0 ml-1.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -334,7 +347,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
             }`}
           >
             <span>{t.library.filterAll}</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+            <span className={`text-[10px] min-w-[20px] h-5 px-1.5 rounded-full font-mono font-bold inline-flex items-center justify-center shrink-0 ${
               filterStatus === 'all' ? 'bg-white/20 text-white' : 'bg-yarn-100 text-yarn-700'
             }`}>
               {filteredByLevelAndCategory.length}
@@ -356,7 +369,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                 ? (t.library.filterNotStartedSingular || 'Non commencé')
                 : (t.library.filterNotStartedPlural || 'Non commencés')}
             </span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+            <span className={`text-[10px] min-w-[20px] h-5 px-1.5 rounded-full font-mono font-bold inline-flex items-center justify-center shrink-0 ${
               filterStatus === 'not_started' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-800'
             }`}>
               {notStartedCount}
@@ -374,7 +387,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
           >
             <Sparkles className="w-2.5 h-2.5 shrink-0" />
             <span className="truncate">{t.library.filterInProgress}</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+            <span className={`text-[10px] min-w-[20px] h-5 px-1.5 rounded-full font-mono font-bold inline-flex items-center justify-center shrink-0 ${
               filterStatus === 'in_progress' ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-700'
             }`}>
               {inProgressCount}
@@ -396,7 +409,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                 ? (t.library.filterCompletedSingular || 'Terminé')
                 : (t.library.filterCompletedPlural || 'Terminés')}
             </span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+            <span className={`text-[10px] min-w-[20px] h-5 px-1.5 rounded-full font-mono font-bold inline-flex items-center justify-center shrink-0 ${
               filterStatus === 'completed' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
             }`}>
               {completedCount}
@@ -538,9 +551,16 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                 </div>
 
                 <div className="pt-4 mt-4 border-t border-yarn-100 flex items-center justify-between text-xs text-yarn-500">
-                  <span className="capitalize font-medium">
-                    {tutorial.level ? ((t.project.levels as any)?.[tutorial.level.toLowerCase()] || tutorial.level) : t.library.allLevels}
-                  </span>
+                  {tutorial.level ? (
+                    <LevelBadge
+                      level={tutorial.level}
+                      label={(t.project.levels as any)?.[tutorial.level.toLowerCase()] || tutorial.level}
+                    />
+                  ) : (
+                    <span className="text-yarn-400 text-[11px] font-medium">
+                      {t.library.allLevels}
+                    </span>
+                  )}
                   <span className={`font-semibold transition-transform group-hover:translate-x-1 inline-flex items-center gap-1 ${
                     isCompleted
                       ? 'text-emerald-700'

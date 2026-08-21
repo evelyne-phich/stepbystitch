@@ -108,10 +108,10 @@ export function CategoryBadge({ category, label, className = '' }: CategoryBadge
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider border ${style.badgeClass} ${className}`}
+      className={`h-6 inline-flex items-center gap-1.5 px-2.5 rounded-lg text-[10px] sm:text-[11px] font-bold uppercase tracking-wider border shadow-2xs shrink-0 ${style.badgeClass} ${className}`}
     >
       <CategoryIcon category={category} className={`w-3 h-3 ${style.iconColor} shrink-0`} />
-      <span>{displayLabel}</span>
+      <span className="truncate">{displayLabel}</span>
     </span>
   );
 }

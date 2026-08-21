@@ -94,6 +94,33 @@ export async function updateTutorialDetails(
     throw new Error('Failed to update project details');
   }
 
+  // Also synchronize title and note in any existing cached translations so the translation doesn't override the user's edit
+  try {
+    const { data: trRows } = await (supabase.from('translations') as any)
+      .select('id, content')
+      .eq('tutorial_id', tutorialId);
+
+    if (trRows && trRows.length > 0) {
+      for (const tr of trRows) {
+        if (tr.content && typeof tr.content === 'object') {
+          const updatedContent = {
+            ...tr.content,
+            title: updates.title.trim(),
+            note: updates.note ? updates.note.trim() : null,
+          };
+          await (supabase.from('translations') as any)
+            .update({
+              content: updatedContent,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', tr.id);
+        }
+      }
+    }
+  } catch (trErr) {
+    console.warn('[Action updateTutorialDetails] Error syncing translation details:', trErr);
+  }
+
   revalidatePath(`/library/${tutorialId}`);
   revalidatePath('/library');
 }
@@ -140,6 +167,31 @@ export async function resetSectionChecklistItems(tutorialId: string, sectionName
   if (error) {
     console.error('[Action resetSectionChecklistItems] Error resetting section items:', error);
     throw new Error('Failed to reset section items');
+  }
+
+  revalidatePath('/library');
+}
+
+/**
+ * Updates a batch of checklist item IDs to checked or unchecked.
+ */
+export async function updateChecklistItemsBatch(tutorialId: string, itemIds: string[], checked: boolean) {
+  if (!itemIds.length) return;
+  const supabase = await createClient();
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new Error('Unauthorized');
+  }
+
+  const { error } = await (supabase.from('checklist_items') as any)
+    .update({ checked, updated_at: new Date().toISOString() })
+    .eq('tutorial_id', tutorialId)
+    .in('id', itemIds);
+
+  if (error) {
+    console.error('[Action updateChecklistItemsBatch] Error updating items:', error);
+    throw new Error('Failed to update items');
   }
 
   revalidatePath('/library');

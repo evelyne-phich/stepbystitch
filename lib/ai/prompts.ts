@@ -148,7 +148,8 @@ Key Rules:
 
 7. **No Hallucination / Missing Steps**:
    - Do NOT skip any assembly, color change, or finishing instructions.
-   - If text is corrupted or handwritten, decipher the most probable crochet instructions based on standard crochet stitch geometry.`;
+   - If text is corrupted or handwritten, decipher the most probable crochet instructions based on standard crochet stitch geometry.
+   - ONLY extract the description/summary if explicitly written in the original pattern. If the author did not write an introduction or description, leave \`summary\` empty. DO NOT invent or generate one.`;
 
 export const CROCHET_PATTERN_JSON_SCHEMA = {
   type: 'object',
@@ -192,7 +193,7 @@ export const CROCHET_PATTERN_JSON_SCHEMA = {
     },
     summary: {
       type: 'string',
-      description: 'Short 1-2 sentence description of what this pattern makes.',
+      description: 'Optional introductory note or description ONLY if explicitly present in the original pattern. If not present, leave empty or omitted. Do NOT invent a summary.',
     },
     sections: {
       type: 'array',
