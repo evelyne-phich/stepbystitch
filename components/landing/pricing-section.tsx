@@ -6,7 +6,7 @@ import { Check, Sparkles, ShieldCheck, Zap, ArrowRight, Layers } from 'lucide-re
 import { useI18n } from '@/lib/i18n/context';
 
 export function PricingSection() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [isYearly, setIsYearly] = useState(true);
 
   const { pricingSection } = t;
@@ -202,10 +202,22 @@ export function PricingSection() {
 
         </div>
 
-        {/* Guarantee Banner */}
-        <div className="mt-12 text-center flex items-center justify-center gap-2 text-xs font-semibold text-yarn-600">
-          <ShieldCheck className="w-4 h-4 text-sage-600" />
-          <span>{pricingSection.guaranteeText}</span>
+        {/* Guarantee Banner & Terms Notice */}
+        <div className="mt-12 text-center space-y-2">
+          <div className="flex items-center justify-center gap-2 text-xs font-semibold text-yarn-600">
+            <ShieldCheck className="w-4 h-4 text-sage-600" />
+            <span>{pricingSection.guaranteeText}</span>
+          </div>
+          <p className="text-[11px] text-yarn-600 font-medium">
+            <span>{pricingSection.fairUseNoticePrefix} </span>
+            <Link
+              href={locale === 'fr' ? '/cgu' : '/terms'}
+              className="text-sage-800 underline underline-offset-2 hover:text-sage-950 font-semibold transition-colors"
+            >
+              {pricingSection.fairUseNoticeLink}
+            </Link>
+            <span>.</span>
+          </p>
         </div>
 
       </div>

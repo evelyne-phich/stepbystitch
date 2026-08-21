@@ -105,13 +105,11 @@ export function Footer() {
             </h3>
             <ul className="space-y-2.5 text-sm text-yarn-300">
               <li>
-                <Link href="/login" className="hover:text-white transition-colors">
-                  {t.common.login}
-                </Link>
-              </li>
-              <li>
-                <Link href="/signup" className="hover:text-white transition-colors">
-                  {t.common.createAccount}
+                <Link
+                  href={locale === 'fr' ? '/cgu' : '/terms'}
+                  className="hover:text-white transition-colors"
+                >
+                  {locale === 'fr' ? 'Conditions d’Utilisation (CGU)' : 'Terms of Service'}
                 </Link>
               </li>
               <li>

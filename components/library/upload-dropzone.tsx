@@ -200,6 +200,14 @@ export function UploadDropzone() {
         return;
       }
 
+      if (data.error === 'ABNORMAL_ACTIVITY') {
+        setErrorMessage(t.upload.abnormalActivityError);
+        setIsSubmitting(false);
+        clearTimeout(stepTimer1);
+        clearTimeout(stepTimer2);
+        return;
+      }
+
       if (!response.ok || !data.success) {
         throw new Error(data.message || t.upload.errorGeneric);
       }

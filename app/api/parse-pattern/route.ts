@@ -4,6 +4,7 @@ import { createServerClient, createAdminClient } from '@/lib/supabase/server';
 import { parsePatternWithGemini, type ParsePatternInput } from '@/lib/ai/client';
 import { CROCHET_PARSER_SYSTEM_INSTRUCTION } from '@/lib/ai/prompts';
 import { checkUserUploadQuota, recordAiTokenUsage } from '@/lib/ai/usage-tracker';
+import { checkRateLimit } from '@/lib/security/rate-limiter';
 import type { SourceType } from '@/lib/types/database';
 
 export const maxDuration = 120; // Allow up to 120 seconds for multi-page AI OCR and parsing
@@ -43,9 +44,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Verify User Upload Quota (Free tier: max 3 patterns)
+    // Anti-bot & Anti-abuse: Sliding Window Rate Limiting (max 5 requests per 60 seconds per user)
+    const rateLimit = checkRateLimit(`parse_pattern:${user.id}`, 5, 60_000);
+    if (!rateLimit.allowed) {
+      console.warn(
+        `[API /api/parse-pattern] 🛑 Rate limit exceeded for user ${user.id}. Retry after ${rateLimit.retryAfterSeconds}s`
+      );
+      return NextResponse.json(
+        {
+          error: 'RATE_LIMITED',
+          message: `Too many requests. Please wait ${rateLimit.retryAfterSeconds} seconds before importing another pattern.`,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.retryAfterSeconds),
+          },
+        }
+      );
+    }
+
+    // 2. Verify User Upload Quota (Free tier: max 3 patterns, Safety cap: 500/month)
     const quota = await checkUserUploadQuota(user.id);
     if (!quota.canUpload) {
+      if (quota.reason === 'ABNORMAL_ACTIVITY') {
+        console.warn(
+          `[API /api/parse-pattern] 🛑 Monthly safety cap exceeded for user ${user.id} (${quota.currentCount}/${quota.maxAllowed})`
+        );
+        return NextResponse.json(
+          {
+            error: 'ABNORMAL_ACTIVITY',
+            message: 'Unusual activity detected: automatic imports are temporarily suspended to protect our servers.',
+            currentCount: quota.currentCount,
+            maxAllowed: quota.maxAllowed,
+          },
+          { status: 429 }
+        );
+      }
+
       console.warn(
         `[API /api/parse-pattern] 🚫 Quota exceeded for user ${user.id} (${quota.currentCount}/${quota.maxAllowed})`
       );

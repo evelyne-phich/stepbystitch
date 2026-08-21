@@ -9,11 +9,20 @@ export type Json =
 export type SourceType = 'pdf' | 'image' | 'manuscrit' | 'text';
 export type TranslationStatus = 'pending' | 'processing' | 'done' | 'failed';
 
+export interface AppSetting {
+  key: string;
+  value: Json;
+  description?: string | null;
+  updated_at: string;
+}
+
 export interface Profile {
   id: string;
   email: string;
   langue_preferee: string;
   full_name?: string | null;
+  monthly_cap_override?: number | null;
+  free_quota_override?: number | null;
   created_at: string;
   updated_at: string;
 }
