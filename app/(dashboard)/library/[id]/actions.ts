@@ -67,6 +67,7 @@ export async function updateTutorialDetails(
     note?: string | null;
     stitch?: string | null;
     level?: string | null;
+    project_type?: string | null;
   }
 ) {
   const supabase = await createClient();
@@ -82,6 +83,7 @@ export async function updateTutorialDetails(
       note: updates.note ? updates.note.trim() : null,
       stitch: updates.stitch ? updates.stitch.trim() : null,
       level: updates.level ? updates.level.trim() : null,
+      project_type: updates.project_type ? updates.project_type.trim() : null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', tutorialId)

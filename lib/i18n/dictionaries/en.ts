@@ -348,6 +348,7 @@ Sew the leaf on top of the apple.`,
     sectionGeneral: 'General instructions',
     stitchCountTooltip: 'Total stitch count at the end of the round',
     levelLabel: 'Level',
+    categoryLabel: 'Category',
     levels: {
       beginner: 'Beginner',
       intermediate: 'Intermediate',

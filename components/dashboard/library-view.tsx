@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, Search, BookOpen, CheckCircle2, Sparkles, Circle, Check, ChevronDown, Layers, Tag } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/context';
+import { CategoryBadge, CategoryIcon, getCategoryStyle } from '@/components/ui/category-icon';
 import type { TutorialWithProgress } from '@/lib/types/database';
 
 interface LibraryViewProps {
@@ -255,12 +256,15 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                 }}
                 className={`w-full sm:w-auto inline-flex items-center justify-between sm:justify-start gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer ${
                   filterCategory !== 'all'
-                    ? 'bg-sage-100 text-sage-900 border-sage-300 shadow-xs'
+                    ? `${getCategoryStyle(filterCategory).badgeClass} shadow-xs`
                     : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
                 }`}
               >
                 <div className="flex items-center gap-1.5 truncate">
-                  <Tag className="w-3.5 h-3.5 text-sage-700 shrink-0" />
+                  <CategoryIcon
+                    category={filterCategory !== 'all' ? filterCategory : null}
+                    className={`w-3.5 h-3.5 shrink-0 ${filterCategory !== 'all' ? getCategoryStyle(filterCategory).iconColor : 'text-sage-700'}`}
+                  />
                   <span className="truncate">
                     {filterCategory === 'all'
                       ? t.library.filterCategoryAll || 'Toutes les catégories'
@@ -286,6 +290,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                     <div className="space-y-0.5 max-h-64 overflow-y-auto">
                       {CATEGORY_OPTIONS.map((opt) => {
                         const isSelected = filterCategory === opt.key;
+                        const optStyle = getCategoryStyle(opt.key !== 'all' ? opt.key : null);
                         return (
                           <button
                             key={opt.key}
@@ -295,10 +300,16 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                               setShowCategoryDropdown(false);
                             }}
                             className={`w-full text-left px-2.5 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
-                              isSelected ? 'font-bold text-sage-900 bg-sage-50' : 'text-yarn-800 hover:bg-yarn-50'
+                              isSelected ? `font-bold text-yarn-950 ${optStyle.activeBg}` : 'text-yarn-800 hover:bg-yarn-50'
                             }`}
                           >
-                            <span>{opt.label}</span>
+                            <div className="flex items-center gap-2 truncate">
+                              <CategoryIcon
+                                category={opt.key !== 'all' ? opt.key : null}
+                                className={`w-3.5 h-3.5 shrink-0 ${optStyle.iconColor}`}
+                              />
+                              <span className="truncate">{opt.label}</span>
+                            </div>
                             {isSelected && <Check className="w-3.5 h-3.5 text-sage-700 shrink-0 ml-1.5" />}
                           </button>
                         );
@@ -443,10 +454,10 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {/* Category / Project Type Badge */}
                       {tutorial.project_type && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider bg-yarn-100 text-yarn-800 border border-yarn-200/80">
-                          <Tag className="w-3 h-3 text-sage-600" />
-                          <span>{(t.project.projectTypes as any)?.[tutorial.project_type.toLowerCase()] || tutorial.project_type}</span>
-                        </span>
+                        <CategoryBadge
+                          category={tutorial.project_type}
+                          label={(t.project.projectTypes as any)?.[tutorial.project_type.toLowerCase()] || tutorial.project_type}
+                        />
                       )}
 
                       {/* Status Badges: Red / Orange / Green Color Coding */}

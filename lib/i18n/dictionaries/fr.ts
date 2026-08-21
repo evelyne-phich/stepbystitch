@@ -348,6 +348,7 @@ Coudre la feuille sur le haut de la pomme.`,
     sectionGeneral: 'Instructions générales',
     stitchCountTooltip: 'Total de mailles à la fin du rang',
     levelLabel: 'Niveau',
+    categoryLabel: 'Catégorie',
     levels: {
       beginner: 'Débutant',
       intermediate: 'Intermédiaire',

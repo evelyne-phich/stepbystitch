@@ -30,8 +30,10 @@ import {
   Languages,
   ZoomIn,
   ZoomOut,
+  Tag,
 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/context';
+import { CategoryBadge, CategoryIcon, getCategoryStyle } from '@/components/ui/category-icon';
 import { StitchTerm } from '@/components/ui/stitch-term';
 import type { Tutorial, ChecklistItem, TutorialMaterial } from '@/lib/types/database';
 import {
@@ -537,20 +539,45 @@ export function ProjectDetailView({
   const [projectNote, setProjectNote] = useState(tutorial.note || '');
   const [projectStitch, setProjectStitch] = useState(tutorial.stitch || '');
   const [projectLevel, setProjectLevel] = useState(tutorial.level || '');
+  const [projectType, setProjectType] = useState(tutorial.project_type || '');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSavingDetails, setIsSavingDetails] = useState(false);
+
+  // Dropdown options for Edit Modal
+  const EDIT_LEVEL_OPTIONS = [
+    { key: '', label: t.library.allLevels || 'Non spécifié' },
+    { key: 'beginner', label: (t.project.levels as any)?.beginner || 'Débutant' },
+    { key: 'intermediate', label: (t.project.levels as any)?.intermediate || 'Intermédiaire' },
+    { key: 'advanced', label: (t.project.levels as any)?.advanced || 'Avancé' },
+  ] as const;
+
+  const EDIT_CATEGORY_OPTIONS = [
+    { key: '', label: t.library.filterCategoryAll || 'Non spécifié' },
+    { key: 'amigurumi', label: (t.project.projectTypes as any)?.amigurumi || 'Amigurumi' },
+    { key: 'accessory', label: (t.project.projectTypes as any)?.accessory || 'Accessoire' },
+    { key: 'garment', label: (t.project.projectTypes as any)?.garment || 'Vêtement' },
+    { key: 'blanket', label: (t.project.projectTypes as any)?.blanket || 'Plaid / Couverture' },
+    { key: 'home', label: (t.project.projectTypes as any)?.home || 'Maison & Déco' },
+    { key: 'other', label: (t.project.projectTypes as any)?.other || 'Autre' },
+  ] as const;
 
   // Form input buffer for edit modal
   const [editTitleInput, setEditTitleInput] = useState(tutorial.title);
   const [editNoteInput, setEditNoteInput] = useState(tutorial.note || '');
   const [editStitchInput, setEditStitchInput] = useState(tutorial.stitch || '');
   const [editLevelInput, setEditLevelInput] = useState(tutorial.level || '');
+  const [editProjectTypeInput, setEditProjectTypeInput] = useState(tutorial.project_type || '');
+  const [showEditLevelDropdown, setShowEditLevelDropdown] = useState(false);
+  const [showEditCategoryDropdown, setShowEditCategoryDropdown] = useState(false);
 
   const openEditModal = () => {
     setEditTitleInput(projectTitle);
     setEditNoteInput(projectNote);
     setEditStitchInput(projectStitch);
     setEditLevelInput(projectLevel);
+    setEditProjectTypeInput(projectType);
+    setShowEditLevelDropdown(false);
+    setShowEditCategoryDropdown(false);
     setIsEditModalOpen(true);
   };
 
@@ -565,12 +592,14 @@ export function ProjectDetailView({
         note: editNoteInput.trim() || null,
         stitch: editStitchInput.trim() || null,
         level: editLevelInput.trim() || null,
+        project_type: editProjectTypeInput.trim() || null,
       });
 
       setProjectTitle(editTitleInput.trim());
       setProjectNote(editNoteInput.trim());
       setProjectStitch(editStitchInput.trim());
       setProjectLevel(editLevelInput.trim());
+      setProjectType(editProjectTypeInput.trim());
       setIsEditModalOpen(false);
 
       setTranslationToast({
@@ -1115,14 +1144,17 @@ export function ProjectDetailView({
                 <h1 className="text-sm sm:text-xl font-bold font-serif text-yarn-950 tracking-tight truncate max-w-[180px] sm:max-w-none">
                   {displayTitle}
                 </h1>
-                {tutorial.project_type && (
-                  <span className="hidden md:inline-block px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-yarn-100 text-yarn-800 border border-yarn-200 shrink-0">
-                    {(t.project.projectTypes as any)?.[tutorial.project_type.toLowerCase()] || tutorial.project_type}
-                  </span>
+                {projectType && (
+                  <CategoryBadge
+                    category={projectType}
+                    label={(t.project.projectTypes as any)?.[projectType.toLowerCase()] || projectType}
+                    className="hidden sm:inline-flex py-0.5 text-[10px]"
+                  />
                 )}
                 {projectLevel && (
-                  <span className="hidden sm:inline-block px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-sage-100 text-sage-900 border border-sage-200 shrink-0">
-                    {(t.project.levels as any)?.[projectLevel.toLowerCase()] || projectLevel}
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-sage-100 text-sage-900 border border-sage-200 shrink-0">
+                    <Layers className="w-2.5 h-2.5 text-sage-700 shrink-0" />
+                    <span>{(t.project.levels as any)?.[projectLevel.toLowerCase()] || projectLevel}</span>
                   </span>
                 )}
               </div>
@@ -2298,34 +2330,169 @@ export function ProjectDetailView({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-yarn-900">
-                    {t.project.hookLabel}
+                {/* Custom Category Dropdown */}
+                <div className="space-y-1.5 relative">
+                  <label className="text-xs font-bold text-yarn-900 flex items-center gap-1.5">
+                    <CategoryIcon
+                      category={editProjectTypeInput}
+                      className={`w-3.5 h-3.5 ${editProjectTypeInput ? getCategoryStyle(editProjectTypeInput).iconColor : 'text-sage-700'}`}
+                    />
+                    <span>{t.project.categoryLabel || 'Catégorie'}</span>
                   </label>
-                  <input
-                    type="text"
-                    value={editStitchInput}
-                    onChange={(e) => setEditStitchInput(e.target.value)}
-                    placeholder="Ex: 3.5 mm"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs"
-                  />
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowEditLevelDropdown(false);
+                        setShowEditCategoryDropdown((prev) => !prev);
+                      }}
+                      className={`w-full inline-flex items-center justify-between gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
+                        editProjectTypeInput
+                          ? `${getCategoryStyle(editProjectTypeInput).badgeClass} shadow-xs`
+                          : 'bg-white text-yarn-800 hover:bg-yarn-50 border-yarn-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <CategoryIcon
+                          category={editProjectTypeInput}
+                          className={`w-3.5 h-3.5 shrink-0 ${editProjectTypeInput ? getCategoryStyle(editProjectTypeInput).iconColor : 'text-sage-700'}`}
+                        />
+                        <span className="truncate">
+                          {!editProjectTypeInput
+                            ? (t.library.filterCategoryAll || 'Non spécifié')
+                            : (t.project.projectTypes as any)?.[editProjectTypeInput.toLowerCase()] || editProjectTypeInput}
+                        </span>
+                      </div>
+                      <ChevronDown className="w-3.5 h-3.5 text-yarn-500 shrink-0 ml-1" />
+                    </button>
+
+                    {showEditCategoryDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40 bg-transparent"
+                          onClick={() => setShowEditCategoryDropdown(false)}
+                        />
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute left-0 mt-1.5 w-full rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn"
+                        >
+                          <div className="space-y-0.5 max-h-56 overflow-y-auto">
+                            {EDIT_CATEGORY_OPTIONS.map((opt) => {
+                              const isSelected = (editProjectTypeInput || '').toLowerCase() === opt.key.toLowerCase();
+                              const optStyle = getCategoryStyle(opt.key);
+                              return (
+                                <button
+                                  key={opt.key}
+                                  type="button"
+                                  onClick={() => {
+                                    setEditProjectTypeInput(opt.key);
+                                    setShowEditCategoryDropdown(false);
+                                  }}
+                                  className={`w-full text-left px-2.5 py-2 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
+                                    isSelected ? `font-bold text-yarn-950 ${optStyle.activeBg}` : 'text-yarn-800 hover:bg-yarn-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 truncate">
+                                    <CategoryIcon
+                                      category={opt.key}
+                                      className={`w-3.5 h-3.5 shrink-0 ${optStyle.iconColor}`}
+                                    />
+                                    <span className="truncate">{opt.label}</span>
+                                  </div>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-sage-700 shrink-0 ml-1.5" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-yarn-900">
-                    {t.project.levelLabel}
+                {/* Custom Level Dropdown */}
+                <div className="space-y-1.5 relative">
+                  <label className="text-xs font-bold text-yarn-900 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-sage-700" />
+                    <span>{t.project.levelLabel || 'Niveau'}</span>
                   </label>
-                  <select
-                    value={editLevelInput}
-                    onChange={(e) => setEditLevelInput(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs"
-                  >
-                    <option value="">{t.library.allLevels}</option>
-                    <option value="beginner">{(t.project.levels as any)?.beginner || 'Débutant'}</option>
-                    <option value="intermediate">{(t.project.levels as any)?.intermediate || 'Intermédiaire'}</option>
-                    <option value="advanced">{(t.project.levels as any)?.advanced || 'Avancé'}</option>
-                  </select>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowEditCategoryDropdown(false);
+                        setShowEditLevelDropdown((prev) => !prev);
+                      }}
+                      className={`w-full inline-flex items-center justify-between gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
+                        editLevelInput
+                          ? 'bg-sage-50 text-sage-900 border-sage-300 shadow-xs'
+                          : 'bg-white text-yarn-800 hover:bg-yarn-50 border-yarn-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Layers className="w-3.5 h-3.5 text-sage-700 shrink-0" />
+                        <span className="truncate">
+                          {!editLevelInput
+                            ? (t.library.allLevels || 'Non spécifié')
+                            : (t.project.levels as any)?.[editLevelInput.toLowerCase()] || editLevelInput}
+                        </span>
+                      </div>
+                      <ChevronDown className="w-3.5 h-3.5 text-yarn-500 shrink-0 ml-1" />
+                    </button>
+
+                    {showEditLevelDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40 bg-transparent"
+                          onClick={() => setShowEditLevelDropdown(false)}
+                        />
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute left-0 mt-1.5 w-full rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn"
+                        >
+                          <div className="space-y-0.5 max-h-56 overflow-y-auto">
+                            {EDIT_LEVEL_OPTIONS.map((opt) => {
+                              const isSelected = (editLevelInput || '').toLowerCase() === opt.key.toLowerCase();
+                              return (
+                                <button
+                                  key={opt.key}
+                                  type="button"
+                                  onClick={() => {
+                                    setEditLevelInput(opt.key);
+                                    setShowEditLevelDropdown(false);
+                                  }}
+                                  className={`w-full text-left px-2.5 py-2 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
+                                    isSelected ? 'font-bold text-sage-900 bg-sage-50' : 'text-yarn-800 hover:bg-yarn-50'
+                                  }`}
+                                >
+                                  <span>{opt.label}</span>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-sage-700 shrink-0 ml-1.5" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
+              </div>
+
+              {/* Hook Size */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-yarn-900 flex items-center gap-1.5">
+                  <Volleyball className="w-3.5 h-3.5 text-sage-700" />
+                  <span>{t.project.hookLabel}</span>
+                </label>
+                <input
+                  type="text"
+                  value={editStitchInput}
+                  onChange={(e) => setEditStitchInput(e.target.value)}
+                  placeholder="Ex: 3.5 mm"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs"
+                />
               </div>
 
               <div className="pt-3 border-t border-yarn-100 flex items-center justify-end gap-2.5">
