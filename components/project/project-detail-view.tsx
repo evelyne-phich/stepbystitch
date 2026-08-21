@@ -47,6 +47,7 @@ import {
 import {
   SUPPORTED_TRANSLATION_LANGUAGES,
   type TranslatedPatternContent,
+  type TranslationLanguageInfo,
 } from '@/lib/ai/translator';
 
 interface ProjectDetailViewProps {
@@ -254,6 +255,33 @@ function parseSectionOrdinal(secName: string): { base: string; index: number; fo
   }
 
   return null;
+}
+
+function isValidNote(note?: string | null): boolean {
+  if (!note) return false;
+  const trimmed = note.trim();
+  return (
+    trimmed !== '' &&
+    trimmed.toLowerCase() !== 'null' &&
+    trimmed.toLowerCase() !== 'undefined' &&
+    trimmed !== 'DEFAULT_NOTE'
+  );
+}
+
+function cleanNoteValue(note?: string | null): string | null {
+  return isValidNote(note) ? note!.trim() : null;
+}
+
+function getSourceLanguageInfo(rawLang?: string | null): TranslationLanguageInfo {
+  const norm = (rawLang || '').toLowerCase().trim();
+  if (norm === 'fr') return { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷' };
+  if (norm === 'en_uk' || norm === 'uk') return { code: 'en_uk', name: 'English (UK)', nativeName: 'English (UK)', flag: '🇬🇧' };
+  if (norm === 'es') return { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸' };
+  if (norm === 'de') return { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪' };
+  if (norm === 'ru') return { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺' };
+  if (norm === 'pt') return { code: 'pt', name: 'Portuguese', nativeName: 'Português', flag: '🇵🇹' };
+  if (norm === 'zh') return { code: 'zh', name: 'Chinese', nativeName: '中文', flag: '🇨🇳' };
+  return { code: 'en_us', name: 'English (US)', nativeName: 'English (US)', flag: '🇺🇸' };
 }
 
 interface ZoomableImageViewerProps {
@@ -632,10 +660,17 @@ export function ProjectDetailView({
   };
 
   // Multi-Language AI Translation State
-  const [currentLanguage, setCurrentLanguage] = useState<string>('original');
+  // Automatically activate the translated version if it matches the current site locale
+  const initialPreferredLanguage = (() => {
+    if (locale === 'fr' && initialTranslations?.['fr']) return 'fr';
+    if (locale === 'en' && initialTranslations?.['en_us']) return 'en_us';
+    return 'original';
+  })();
+
+  const [currentLanguage, setCurrentLanguage] = useState<string>(initialPreferredLanguage);
   const [translationsCache, setTranslationsCache] = useState<Record<string, TranslatedPatternContent>>(initialTranslations);
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
-  const [translationToast, setTranslationToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [translationToast, setTranslationToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState<boolean>(false);
 
   const handleSelectLanguage = async (langCode: string) => {
@@ -653,6 +688,11 @@ export function ProjectDetailView({
     }
 
     setIsTranslating(true);
+    setTranslationToast({
+      message: t.project.translationInProgressToast,
+      type: 'info',
+    });
+
     try {
       const res = await getOrTranslatePatternAction(tutorial.id, langCode);
       if (res.success && res.content) {
@@ -904,22 +944,32 @@ export function ProjectDetailView({
     }
   };
 
-  // Merge translated step labels & section names if active translation is selected
+  // Merge translated step labels, section names, and notes if active translation is selected
   const activeTranslation = currentLanguage !== 'original' ? translationsCache[currentLanguage] : null;
 
   const displayItems = activeTranslation
     ? items.map((item) => {
         const transStep = activeTranslation.steps.find((s) => s.order_index === item.order_index);
         if (transStep) {
+          const rawNote = item.edited_by_user
+            ? item.note
+            : (transStep.note !== undefined && transStep.note !== null ? transStep.note : item.note);
           return {
             ...item,
             label: item.edited_by_user ? item.label : transStep.label,
             section: transStep.section || item.section,
+            note: cleanNoteValue(rawNote),
           };
         }
-        return item;
+        return {
+          ...item,
+          note: cleanNoteValue(item.note),
+        };
       })
-    : items;
+    : items.map((item) => ({
+        ...item,
+        note: cleanNoteValue(item.note),
+      }));
 
   // Group checklist items by section and automatically group pairs/multiples
   const rawSectionsMap = displayItems.reduce<Record<string, ChecklistItem[]>>((acc, item) => {
@@ -1042,14 +1092,14 @@ export function ProjectDetailView({
                 bumpKey > 0 ? 'animate-badge-pop' : ''
               } ${
                 isAllDone
-                  ? 'bg-gradient-to-br from-emerald-600 to-emerald-700 text-white ring-2 ring-emerald-400/50 shadow-emerald-700/20'
+                  ? 'bg-gradient-to-br from-emerald-600 to-teal-500 text-white ring-2 ring-emerald-400/50 shadow-emerald-700/20'
                   : progressPercent > 0
-                  ? 'bg-gradient-to-br from-sage-800 to-sage-900 text-white ring-2 ring-sage-600/40 shadow-sm'
-                  : 'bg-gradient-to-br from-yarn-400 to-yarn-500 text-white ring-1 ring-yarn-300'
+                  ? 'bg-gradient-to-br from-orange-500 to-amber-400 text-white ring-2 ring-orange-400/50 shadow-orange-500/20'
+                  : 'bg-gradient-to-br from-rose-400 to-rose-500 text-white ring-2 ring-rose-300/40 shadow-rose-500/10'
               }`}
             >
               {isAllDone ? (
-                <Sparkles className="w-4 h-4 text-emerald-200 animate-pulse" />
+                <Sparkles className="w-4 h-4 text-emerald-100 animate-pulse" />
               ) : (
                 <span className="text-xs sm:text-sm font-extrabold tracking-tight leading-none text-white">
                   {progressPercent}%
@@ -1074,7 +1124,15 @@ export function ProjectDetailView({
                 )}
               </div>
               <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-semibold text-yarn-600">
-                <span className="truncate">
+                <span
+                  className={`truncate font-bold ${
+                    isAllDone
+                      ? 'text-emerald-700'
+                      : progressPercent > 0
+                      ? 'text-orange-500'
+                      : 'text-rose-600'
+                  }`}
+                >
                   {completedCount} / {totalItems} {t.project.roundsCompleted}
                 </span>
                 {isAllDone && (
@@ -1089,99 +1147,110 @@ export function ProjectDetailView({
           {/* Right: Action Buttons */}
           <div className="flex items-center justify-end gap-2 shrink-0">
             {/* Language & Technical Translation Switcher Dropdown */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                disabled={isTranslating}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 ${
-                  currentLanguage !== 'original'
-                    ? 'bg-sage-100 text-sage-900 border-sage-300 shadow-xs'
-                    : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
-                }`}
-                title={t.project.translationTitle}
-              >
-                {isTranslating ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-sage-700" />
-                ) : (
-                  <Globe className="w-3.5 h-3.5 text-sage-700" />
-                )}
-                <span className="hidden md:inline">
-                  {currentLanguage === 'original'
-                    ? 'Original'
-                    : (SUPPORTED_TRANSLATION_LANGUAGES.find((l) => l.code === currentLanguage)?.flag || '🌐') +
-                      ' ' +
-                      (SUPPORTED_TRANSLATION_LANGUAGES.find((l) => l.code === currentLanguage)?.code.toUpperCase() || '')}
-                </span>
-                <span className="md:hidden text-[11px]">
-                  {currentLanguage === 'original'
-                    ? '🌐'
-                    : (SUPPORTED_TRANSLATION_LANGUAGES.find((l) => l.code === currentLanguage)?.flag || '🌐')}
-                </span>
-                <ChevronDown className="w-3 h-3 text-yarn-500" />
-              </button>
+            {(() => {
+              const sourceLang = getSourceLanguageInfo(tutorial.raw_content_language);
+              const isViewingOriginal = currentLanguage === 'original' || currentLanguage === sourceLang.code;
+              const activeLangInfo = isViewingOriginal
+                ? sourceLang
+                : SUPPORTED_TRANSLATION_LANGUAGES.find((l) => l.code === currentLanguage) || sourceLang;
 
-              {/* Floating Dropdown Menu */}
-              {showLanguageDropdown && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowLanguageDropdown(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-60 sm:w-64 rounded-2xl bg-white/98 backdrop-blur-xl border border-yarn-200 shadow-lift py-2 z-50 animate-fadeIn">
-                    <div className="px-3.5 py-1.5 text-[10px] font-bold text-yarn-500 uppercase tracking-wider border-b border-yarn-100">
-                      {t.project.translateTo}
-                    </div>
+              return (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                    disabled={isTranslating}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 ${
+                      !isViewingOriginal
+                        ? 'bg-sage-100 text-sage-900 border-sage-300 shadow-xs'
+                        : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
+                    }`}
+                    title={t.project.translationTitle}
+                  >
+                    {isTranslating ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-sage-700" />
+                    ) : (
+                      <span className="text-sm leading-none">{activeLangInfo.flag}</span>
+                    )}
+                    <span className="hidden md:inline">
+                      {(t.project.languageNames as any)?.[activeLangInfo.code] || activeLangInfo.nativeName}
+                    </span>
+                    <ChevronDown className="w-3 h-3 text-yarn-500" />
+                  </button>
 
-                    {/* Original Option */}
-                    <button
-                      type="button"
-                      onClick={() => handleSelectLanguage('original')}
-                      className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-yarn-50 transition-colors ${
-                        currentLanguage === 'original' ? 'font-bold text-sage-900 bg-sage-50/80' : 'text-yarn-800'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>🌐</span>
-                        <span>{t.project.languageNames.original}</span>
-                      </span>
-                      {currentLanguage === 'original' && <Check className="w-3.5 h-3.5 text-sage-700" />}
-                    </button>
-
-                    <div className="h-px bg-yarn-100 my-1" />
-
-                    {/* Supported Languages */}
-                    {SUPPORTED_TRANSLATION_LANGUAGES.map((lang) => {
-                      const isSelected = currentLanguage === lang.code;
-                      const isCached = !!translationsCache[lang.code];
-                      return (
+                  {/* Floating Dropdown Menu (Compact, content-fitted, no scrollbar) */}
+                  {showLanguageDropdown && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40 bg-transparent"
+                        onClick={() => setShowLanguageDropdown(false)}
+                      />
+                      <div className="absolute right-0 mt-2 w-48 sm:w-52 rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn">
+                        {/* Source Language Option */}
+                        <div className="px-2.5 py-1 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
+                          {t.project.originalLanguage}
+                        </div>
                         <button
-                          key={lang.code}
                           type="button"
-                          onClick={() => handleSelectLanguage(lang.code)}
-                          className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-yarn-50 transition-colors ${
-                            isSelected ? 'font-bold text-sage-900 bg-sage-50/80' : 'text-yarn-800'
+                          onClick={() => handleSelectLanguage('original')}
+                          className={`w-full text-left px-2.5 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
+                            isViewingOriginal ? 'font-bold text-sage-900 bg-sage-50' : 'text-yarn-800 hover:bg-yarn-50'
                           }`}
                         >
                           <span className="flex items-center gap-2 truncate">
-                            <span className="shrink-0">{lang.flag}</span>
-                            <span className="truncate">
-                              {(t.project.languageNames as any)?.[lang.code] || `${lang.name} (${lang.nativeName})`}
+                            <span className="text-sm shrink-0">{sourceLang.flag}</span>
+                            <span className="truncate font-medium">
+                              {(t.project.languageNames as any)?.[sourceLang.code] || sourceLang.nativeName}
                             </span>
                           </span>
-                          <span className="flex items-center gap-1.5 shrink-0">
-                            {isCached && !isSelected && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title={t.project.translationCachedBadge} />
-                            )}
-                            {isSelected && <Check className="w-3.5 h-3.5 text-sage-700" />}
-                          </span>
+                          {isViewingOriginal && <Check className="w-3.5 h-3.5 text-sage-700 shrink-0 ml-1.5" />}
                         </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
+
+                        <div className="h-px bg-yarn-100 my-1" />
+
+                        {/* Supported Languages (Excluding Source Language) */}
+                        <div className="px-2.5 py-1 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
+                          {t.project.translateTo}
+                        </div>
+
+                        <div className="space-y-0.5">
+                          {SUPPORTED_TRANSLATION_LANGUAGES.filter((lang) => lang.code !== sourceLang.code).map((lang) => {
+                            const isSelected = currentLanguage === lang.code;
+                            const isCached = !!translationsCache[lang.code];
+                            return (
+                              <button
+                                key={lang.code}
+                                type="button"
+                                onClick={() => handleSelectLanguage(lang.code)}
+                                className={`w-full text-left px-2.5 py-1.5 text-xs rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
+                                  isSelected ? 'font-bold text-sage-900 bg-sage-50' : 'text-yarn-800 hover:bg-yarn-50'
+                                }`}
+                              >
+                                <span className="flex items-center gap-2 truncate">
+                                  <span className="text-sm shrink-0">{lang.flag}</span>
+                                  <span className="truncate">
+                                    {(t.project.languageNames as any)?.[lang.code] || lang.nativeName}
+                                  </span>
+                                </span>
+                                <span className="flex items-center gap-1 shrink-0 ml-1.5">
+                                  {isCached && !isSelected && (
+                                    <span
+                                      className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-2xs"
+                                      title={t.project.translationCachedBadge}
+                                    />
+                                  )}
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-sage-700" />}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Toggle PDF / Original Image / Original Text button */}
             {hasOriginalDocument && (
@@ -1247,13 +1316,15 @@ export function ProjectDetailView({
           </div>
         )}
 
-        {/* Prominent Glow Progress Track */}
+        {/* Prominent Glow Progress Track: Red / Orange / Green */}
         <div className="w-full h-2 sm:h-3 rounded-full bg-yarn-100 overflow-hidden border border-yarn-200/90 shadow-inner p-0.5">
           <div
             className={`h-full rounded-full transition-all duration-500 ease-out ${
               isAllDone
-                ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-400 shadow-sm'
-                : 'bg-gradient-to-r from-sage-800 via-sage-700 to-sage-500 shadow-sm'
+                ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-400 shadow-sm shadow-emerald-500/20'
+                : progressPercent > 0
+                ? 'bg-gradient-to-r from-orange-500 via-amber-400 to-orange-400 shadow-sm shadow-orange-500/20'
+                : 'bg-rose-300'
             }`}
             style={{ width: `${progressPercent}%` }}
           />
@@ -1649,7 +1720,7 @@ export function ProjectDetailView({
                                                   {t.project.cancelEdit}
                                                 </button>
                                               </div>
-                                            ) : item.note ? (
+                                            ) : isValidNote(item.note) ? (
                                               <div
                                                 onClick={(e) => {
                                                   e.stopPropagation();
@@ -1882,7 +1953,7 @@ export function ProjectDetailView({
                                       {t.project.cancelEdit}
                                     </button>
                                   </div>
-                                ) : item.note ? (
+                                ) : isValidNote(item.note) ? (
                                   <div
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -2151,11 +2222,15 @@ export function ProjectDetailView({
             className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-lift text-xs font-bold border backdrop-blur-xl ${
               translationToast.type === 'success'
                 ? 'bg-sage-900/95 text-white border-sage-700 shadow-sage-900/30'
+                : translationToast.type === 'info'
+                ? 'bg-yarn-900/95 text-white border-yarn-700 shadow-yarn-900/30'
                 : 'bg-red-900/95 text-white border-red-700 shadow-red-900/30'
             }`}
           >
             {translationToast.type === 'success' ? (
-              <Sparkles className="w-4 h-4 text-sage-300 animate-spin" />
+              <Sparkles className="w-4 h-4 text-sage-300" />
+            ) : translationToast.type === 'info' ? (
+              <Loader2 className="w-4 h-4 text-sage-300 animate-spin" />
             ) : (
               <AlertCircle className="w-4 h-4 text-red-300" />
             )}

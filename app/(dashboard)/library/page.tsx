@@ -14,7 +14,7 @@ export default async function LibraryPage() {
   if (user) {
     const { data: tutorialsData, error } = await (supabase
       .from('tutorials') as any)
-      .select('*, checklist_items(id, checked)')
+      .select('*, checklist_items(id, checked), translations(target_language, content)')
       .order('saved_at', { ascending: false });
     
     if (error) {

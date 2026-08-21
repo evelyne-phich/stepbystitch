@@ -180,21 +180,34 @@ CRITICAL UX & TECHNICAL RULES:
    - For US English target: ALWAYS use "sc, hdc, dc, tr, sl st, ch, MR, inc, dec, BLO, FLO".
    - For UK English target: ALWAYS use "dc, htr, tr, dtr, ss, ch, MR, inc, dec, BLO, FLO".
 
-2. **STRICT 1:1 PRESERVATION OF ORDER_INDEX**:
+2. **TRANSLATE ALL STEP NOTES & CRAFTING TIPS (\`note\`) — ZERO UNTRANSLATED NOTES**:
+   - Every step \`note\` (color change, stuffing reminders, assembly instructions, placement tips) MUST be fully translated into natural, idiomatic target language.
+   - NEVER leave a note in English when the target language is French!
+   - Common Crochet Note Translations (EN ➔ FR):
+     * "Start with gray yarn. Do not stuff." ➔ "Commencer avec le fil gris. Ne pas rembourrer."
+     * "Change to white yarn." ➔ "Changer pour le fil blanc."
+     * "Stuff firmly as you go." ➔ "Rembourrer fermement au fur et à mesure."
+     * "Do not stuff." ➔ "Ne pas rembourrer."
+     * "Fasten off and leave a long tail for sewing." ➔ "Arrêter le fil et laisser une longue aiguillée pour la couture."
+     * "Insert safety eyes between rounds 7 and 8." ➔ "Placer les yeux de sécurité entre les tours 7 et 8."
+     * "Fold in half and crochet both sides together." ➔ "Plier en deux et fermer en crochetant les deux épaisseurs ensemble."
+     * "Work in continuous spiral." ➔ "Crocheter en spirale continue."
+
+3. **STRICT 1:1 PRESERVATION OF ORDER_INDEX**:
    - You MUST return every single step with its exact original \`order_index\`.
    - Never skip or reorder steps.
 
-3. **PRESERVE STITCH COUNTS IN BRACKETS**:
+4. **PRESERVE STITCH COUNTS IN BRACKETS**:
    - Always preserve the exact stitch counts in brackets at the end of each row (e.g. "[18]"). Do not translate numbers.
 
-3. **ACCURATELY TRANSLATE SECTIONS**:
+5. **ACCURATELY TRANSLATE SECTIONS**:
    - "Tête" ➔ "Head" / "Cabeza" / "Kopf"
    - "Corps" ➔ "Body" / "Cuerpo" / "Körper"
    - "Jambe 1" ➔ "Leg 1" / "Pierna 1" / "Bein 1"
    - "Jambe 2" ➔ "Leg 2" / "Pierna 2" / "Bein 2"
    - "Assemblage & Finitions" ➔ "Assembly & Finishing" / "Montaje" / "Zusammennähen"
 
-4. Return structured JSON matching the provided schema.`;
+6. Return structured JSON matching the provided schema.`;
 
 const CROCHET_TRANSLATION_JSON_SCHEMA = {
   type: 'object',
@@ -347,13 +360,32 @@ export async function translateCrochetPatternWithGemini(
         modelUsed: model,
       };
 
+      const sanitizedSteps = (parsedJson.steps || []).map((s: any) => {
+        let note: string | null = null;
+        if (typeof s.note === 'string') {
+          const trimmed = s.note.trim();
+          if (
+            trimmed !== '' &&
+            trimmed.toLowerCase() !== 'null' &&
+            trimmed.toLowerCase() !== 'undefined' &&
+            trimmed !== 'DEFAULT_NOTE'
+          ) {
+            note = trimmed;
+          }
+        }
+        return {
+          ...s,
+          note,
+        };
+      });
+
       return {
         content: {
           title: parsedJson.title || input.title,
           target_language: input.targetLanguage,
           materials: parsedJson.materials || input.materials,
           sections: parsedJson.sections || input.sections,
-          steps: parsedJson.steps || [],
+          steps: sanitizedSteps,
         },
         usage,
       };

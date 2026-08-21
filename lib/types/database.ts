@@ -58,6 +58,7 @@ export interface TutorialWithProgress extends Tutorial {
   completedSteps?: number;
   progressPercent?: number;
   isCompleted?: boolean;
+  translations?: Array<{ target_language: string; content: any }> | null;
 }
 
 export interface ChecklistItem {
