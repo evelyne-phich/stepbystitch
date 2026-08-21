@@ -98,7 +98,21 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Parse FormData
-    const formData = await request.formData();
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch (formErr: any) {
+      console.error(`[API /api/parse-pattern] ❌ Error parsing request.formData():`, formErr);
+      return NextResponse.json(
+        {
+          error: 'BAD_REQUEST',
+          message: 'Failed to process uploaded pattern files. Please ensure the files are valid PDFs or images (PNG, JPEG, WebP) under 25MB each.',
+          details: formErr?.message || String(formErr),
+        },
+        { status: 400 }
+      );
+    }
+
     const files = formData.getAll('files') as File[];
     const rawText = (formData.get('rawText') as string) || '';
     const userTitle = (formData.get('title') as string) || '';
@@ -112,6 +126,14 @@ export async function POST(request: NextRequest) {
       console.warn(`[API /api/parse-pattern] ⚠️ No files or text provided in payload.`);
       return NextResponse.json(
         { error: 'BAD_REQUEST', message: 'Please provide at least one pattern file (PDF/images) or raw pattern text.' },
+        { status: 400 }
+      );
+    }
+
+    if (files.length > 20) {
+      console.warn(`[API /api/parse-pattern] ⚠️ Too many files uploaded: ${files.length} (max: 20)`);
+      return NextResponse.json(
+        { error: 'MAX_IMAGES_EXCEEDED', message: 'Maximum 20 images allowed per pattern import.' },
         { status: 400 }
       );
     }
@@ -130,6 +152,8 @@ export async function POST(request: NextRequest) {
     // Any prompt or rules refinement will automatically bust stale cache with zero manual version management!
     sha256Hasher.update(CROCHET_PARSER_SYSTEM_INSTRUCTION);
 
+    const pendingUploads: Array<{ path: string; buffer: Buffer; contentType: string; fileName: string }> = [];
+
     if (files.length > 0) {
       const firstFile = files[0];
       const isPdf = firstFile.type === 'application/pdf' || firstFile.name.endsWith('.pdf');
@@ -137,18 +161,21 @@ export async function POST(request: NextRequest) {
       primaryFileName = firstFile.name;
       primaryFileType = firstFile.type;
 
-      // Upload files to Supabase Private Storage `tutorial_files` bucket
+      // Prepare files in memory and compute order-independent SHA-256 signatures
+      const fileHashes: string[] = [];
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        // Feed buffer into SHA-256 hasher for cache detection
-        sha256Hasher.update(buffer);
+        const singleFileHash = createHash('sha256').update(buffer).digest('hex');
+        fileHashes.push(singleFileHash);
 
+        const mimeType = file.type || (isPdf ? 'application/pdf' : 'image/jpeg');
         aiFiles.push({
           buffer,
-          mimeType: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
+          mimeType,
           fileName: file.name,
         });
 
@@ -160,51 +187,33 @@ export async function POST(request: NextRequest) {
           primaryFilePath = storagePath;
         }
 
-        console.log(
-          `[API /api/parse-pattern] ☁️ Uploading "${file.name}" to storage bucket "tutorial_files" at path "${storagePath}"...`
-        );
-
-        const { error: uploadError } = await supabase.storage
-          .from('tutorial_files')
-          .upload(storagePath, buffer, {
-            contentType: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error(`[API /api/parse-pattern] ❌ Storage upload failed for "${file.name}":`, uploadError);
-        } else {
-          console.log(`[API /api/parse-pattern] ✅ File uploaded successfully to private storage.`);
-        }
+        pendingUploads.push({
+          path: storagePath,
+          buffer,
+          contentType: mimeType,
+          fileName: file.name,
+        });
       }
+
+      // Feed sorted file hashes into sha256Hasher so selection order doesn't alter duplicate detection
+      fileHashes.sort().forEach((hash) => sha256Hasher.update(hash));
     } else {
       // Feed trimmed text into SHA-256 hasher
       const trimmedText = rawText.trim();
       sha256Hasher.update(trimmedText);
 
-      // Upload raw text as .txt file into Supabase Private Storage `tutorial_files`
       const storagePath = `${user.id}/${tutorialId}/original_pattern.txt`;
       primaryFilePath = storagePath;
       primaryFileName = 'patron_original.txt';
       primaryFileType = 'text/plain';
 
       const textBuffer = Buffer.from(trimmedText, 'utf-8');
-      console.log(
-        `[API /api/parse-pattern] ☁️ Uploading raw text (${trimmedText.length} chars) to storage bucket "tutorial_files" at path "${storagePath}"...`
-      );
-
-      const { error: uploadError } = await supabase.storage
-        .from('tutorial_files')
-        .upload(storagePath, textBuffer, {
-          contentType: 'text/plain; charset=utf-8',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        console.warn(`[API /api/parse-pattern] Storage upload notice for raw text:`, uploadError);
-      } else {
-        console.log(`[API /api/parse-pattern] ✅ Raw text uploaded successfully to private storage.`);
-      }
+      pendingUploads.push({
+        path: storagePath,
+        buffer: textBuffer,
+        contentType: 'text/plain; charset=utf-8',
+        fileName: 'original_pattern.txt',
+      });
     }
 
     const contentHash = sha256Hasher.digest('hex');
@@ -234,6 +243,31 @@ export async function POST(request: NextRequest) {
         tutorialId: userExistingTutorial[0].id,
         title: userExistingTutorial[0].title,
       });
+    }
+
+    // 5B. Upload files to Supabase Private Storage only for new/non-duplicate patterns
+    try {
+      const adminClient = await createAdminClient();
+      for (const uploadItem of pendingUploads) {
+        console.log(
+          `[API /api/parse-pattern] ☁️ Uploading "${uploadItem.fileName}" to storage bucket "tutorial_files" at path "${uploadItem.path}"...`
+        );
+
+        const { error: uploadError } = await adminClient.storage
+          .from('tutorial_files')
+          .upload(uploadItem.path, uploadItem.buffer, {
+            contentType: uploadItem.contentType,
+            upsert: true,
+          });
+
+        if (uploadError) {
+          console.error(`[API /api/parse-pattern] ❌ Storage upload failed for "${uploadItem.fileName}":`, uploadError);
+        } else {
+          console.log(`[API /api/parse-pattern] ✅ File uploaded successfully to private storage.`);
+        }
+      }
+    } catch (storageErr) {
+      console.error(`[API /api/parse-pattern] ❌ Error in private storage upload batch:`, storageErr);
     }
 
     // 6. Check Permanent Pattern Cache (to bypass Gemini even if original project was deleted)

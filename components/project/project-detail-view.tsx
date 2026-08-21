@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import Link from 'next/link';
 import confetti from 'canvas-confetti';
 import {
@@ -13,6 +13,7 @@ import {
   EyeOff,
   Edit2,
   Check,
+  Copy,
   X,
   Trash2,
   RotateCcw,
@@ -23,6 +24,12 @@ import {
   Loader2,
   Volleyball,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  Languages,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/context';
 import { StitchTerm } from '@/components/ui/stitch-term';
@@ -34,12 +41,20 @@ import {
   resetSectionChecklistItems,
   checkAllChecklistItems,
   deleteTutorial,
+  getOrTranslatePatternAction,
+  updateTutorialDetails,
 } from '@/app/(dashboard)/library/[id]/actions';
+import {
+  SUPPORTED_TRANSLATION_LANGUAGES,
+  type TranslatedPatternContent,
+} from '@/lib/ai/translator';
 
 interface ProjectDetailViewProps {
   tutorial: Tutorial;
   initialItems: ChecklistItem[];
   signedUrl: string | null;
+  signedUrls?: string[];
+  initialTranslations?: Record<string, TranslatedPatternContent>;
 }
 
 // Known crochet terms for inline abbreviation highlighting
@@ -241,15 +256,243 @@ function parseSectionOrdinal(secName: string): { base: string; index: number; fo
   return null;
 }
 
+interface ZoomableImageViewerProps {
+  allImageUrls: string[];
+  currentImageIndex: number;
+  setCurrentImageIndex: React.Dispatch<React.SetStateAction<number>>;
+  title: string;
+}
+
+function ZoomableImageViewer({
+  allImageUrls,
+  currentImageIndex,
+  setCurrentImageIndex,
+  title,
+}: ZoomableImageViewerProps) {
+  const { t } = useI18n();
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [isDragging, setIsDragging] = useState(false);
+  const [hasMoved, setHasMoved] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  // Reset zoom and pan when changing page
+  useEffect(() => {
+    setZoomLevel(1);
+    setPosition({ x: 0, y: 0 });
+  }, [currentImageIndex]);
+
+  const handleZoomIn = () => {
+    setZoomLevel((prev) => Math.min(3.5, Number((prev + 0.25).toFixed(2))));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel((prev) => {
+      const next = Math.max(1, Number((prev - 0.25).toFixed(2)));
+      if (next === 1) setPosition({ x: 0, y: 0 });
+      return next;
+    });
+  };
+
+  const handleResetZoom = () => {
+    setZoomLevel(1);
+    setPosition({ x: 0, y: 0 });
+  };
+
+  // 1-Click Toggle: 100% ➔ 200% ➔ 100% (unless user was dragging/panning)
+  const handleClickImage = () => {
+    if (hasMoved) return;
+    if (zoomLevel === 1) {
+      setZoomLevel(2);
+    } else {
+      handleResetZoom();
+    }
+  };
+
+  // Mouse pan handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setHasMoved(false);
+    if (zoomLevel > 1) {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || zoomLevel <= 1) return;
+    setHasMoved(true);
+    setPosition({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const currentUrl = allImageUrls[currentImageIndex] || allImageUrls[0];
+
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-between gap-2 overflow-hidden select-none bg-yarn-100/60 p-2 sm:p-3">
+      {/* Top Toolbar: Clean Zoom Controls */}
+      <div className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-2xl bg-white/95 backdrop-blur-md shadow-2xs border border-yarn-200 text-xs font-semibold text-yarn-800 z-10">
+        <div className="flex items-center">
+          {allImageUrls.length > 1 ? (
+            <span className="text-xs font-mono px-2.5 py-0.5 rounded-xl bg-yarn-100 text-yarn-800 font-bold border border-yarn-200/60">
+              {currentImageIndex + 1} / {allImageUrls.length}
+            </span>
+          ) : (
+            <span className="text-xs font-mono px-2.5 py-0.5 rounded-xl bg-yarn-100 text-yarn-600 font-bold border border-yarn-200/60">
+              1 / 1
+            </span>
+          )}
+        </div>
+
+        {/* Zoom Controls */}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            disabled={zoomLevel <= 1}
+            title="Zoom arrière (-)"
+            className="p-1.5 rounded-lg hover:bg-yarn-100 disabled:opacity-30 text-yarn-700 hover:text-yarn-950 transition-colors cursor-pointer"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleResetZoom}
+            title="Cliquez pour réinitialiser à 100%"
+            className="font-mono text-xs text-yarn-700 min-w-[42px] text-center cursor-pointer hover:text-sage-900 hover:bg-yarn-100 rounded-md font-bold px-1.5 py-0.5 select-none transition-colors"
+          >
+            {Math.round(zoomLevel * 100)}%
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            disabled={zoomLevel >= 3.5}
+            title="Zoom avant (+)"
+            className="p-1.5 rounded-lg hover:bg-yarn-100 disabled:opacity-30 text-yarn-700 hover:text-yarn-950 transition-colors cursor-pointer"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          {zoomLevel > 1 && (
+            <button
+              type="button"
+              onClick={handleResetZoom}
+              title="Réinitialiser le zoom"
+              className="p-1.5 rounded-lg hover:bg-yarn-100 text-yarn-500 hover:text-yarn-900 transition-colors ml-0.5 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Interactive Zoomable Canvas Area */}
+      <div
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onClick={handleClickImage}
+        className={`flex-1 w-full relative flex items-center justify-center overflow-hidden rounded-2xl bg-yarn-950/5 border border-yarn-200/60 ${
+          zoomLevel > 1 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-zoom-in'
+        }`}
+      >
+        {/* Floating Lateral Chevrons on Image for Fast Clicking */}
+        {allImageUrls.length > 1 && (
+          <>
+            <button
+              type="button"
+              disabled={currentImageIndex === 0}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCurrentImageIndex((prev) => Math.max(0, prev - 1));
+              }}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-white/90 hover:bg-white text-yarn-800 hover:text-sage-900 shadow-soft hover:shadow-lift border border-yarn-200/80 disabled:opacity-0 disabled:pointer-events-none transition-all hover:scale-110 active:scale-95 cursor-pointer"
+              title={t.common.previous}
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              disabled={currentImageIndex === allImageUrls.length - 1}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCurrentImageIndex((prev) => Math.min(allImageUrls.length - 1, prev + 1));
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-white/90 hover:bg-white text-yarn-800 hover:text-sage-900 shadow-soft hover:shadow-lift border border-yarn-200/80 disabled:opacity-0 disabled:pointer-events-none transition-all hover:scale-110 active:scale-95 cursor-pointer"
+              title={t.common.next}
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </>
+        )}
+
+        <div
+          style={{
+            transform: `translate(${position.x}px, ${position.y}px) scale(${zoomLevel})`,
+            transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+            transformOrigin: 'center center',
+          }}
+          className="w-full h-full flex items-center justify-center p-2"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={currentUrl}
+            alt={`${title} - Page ${currentImageIndex + 1}`}
+            draggable={false}
+            className="max-w-full max-h-full object-contain rounded-xl shadow-soft pointer-events-none"
+          />
+        </div>
+      </div>
+
+      {/* Bottom Thumbnails Strip */}
+      {allImageUrls.length > 1 && (
+        <div className="w-full flex items-center justify-center py-1 px-1 z-10">
+          <div className="flex items-center gap-2 overflow-x-auto max-w-full py-1 px-2">
+            {allImageUrls.map((url, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setCurrentImageIndex(idx)}
+                className={`relative w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden border-2 transition-all flex-shrink-0 cursor-pointer ${
+                  currentImageIndex === idx
+                    ? 'border-sage-700 scale-105 shadow-soft ring-2 ring-sage-200'
+                    : 'border-transparent opacity-50 hover:opacity-100 hover:scale-100'
+                }`}
+                title={`Page ${idx + 1}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt={`Miniature ${idx + 1}`} className="w-full h-full object-cover" />
+                <span className="absolute bottom-0.5 right-0.5 text-[9px] font-mono font-bold px-1 rounded bg-black/60 text-white">
+                  {idx + 1}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ProjectDetailView({
   tutorial,
   initialItems,
   signedUrl,
+  signedUrls = [],
+  initialTranslations = {},
 }: ProjectDetailViewProps) {
   const { t, locale } = useI18n();
   const [items, setItems] = useState<ChecklistItem[]>(initialItems);
   const [showOriginal, setShowOriginal] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isPending, startTransition] = useTransition();
+
+  const allImageUrls = signedUrls && signedUrls.length > 0 ? signedUrls : (signedUrl ? [signedUrl] : []);
 
   // Item currently being edited inline
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -261,8 +504,116 @@ export function ProjectDetailView({
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  // Editable Project Details State
+  const [projectTitle, setProjectTitle] = useState(tutorial.title);
+  const [projectNote, setProjectNote] = useState(tutorial.note || '');
+  const [projectStitch, setProjectStitch] = useState(tutorial.stitch || '');
+  const [projectLevel, setProjectLevel] = useState(tutorial.level || '');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+
+  // Form input buffer for edit modal
+  const [editTitleInput, setEditTitleInput] = useState(tutorial.title);
+  const [editNoteInput, setEditNoteInput] = useState(tutorial.note || '');
+  const [editStitchInput, setEditStitchInput] = useState(tutorial.stitch || '');
+  const [editLevelInput, setEditLevelInput] = useState(tutorial.level || '');
+
+  const openEditModal = () => {
+    setEditTitleInput(projectTitle);
+    setEditNoteInput(projectNote);
+    setEditStitchInput(projectStitch);
+    setEditLevelInput(projectLevel);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTitleInput.trim()) return;
+
+    setIsSavingDetails(true);
+    try {
+      await updateTutorialDetails(tutorial.id, {
+        title: editTitleInput.trim(),
+        note: editNoteInput.trim() || null,
+        stitch: editStitchInput.trim() || null,
+        level: editLevelInput.trim() || null,
+      });
+
+      setProjectTitle(editTitleInput.trim());
+      setProjectNote(editNoteInput.trim());
+      setProjectStitch(editStitchInput.trim());
+      setProjectLevel(editLevelInput.trim());
+      setIsEditModalOpen(false);
+
+      setTranslationToast({
+        message: t.project.detailsSavedToast,
+        type: 'success',
+      });
+      setTimeout(() => setTranslationToast(null), 3000);
+    } catch (err) {
+      console.error('Error saving project details:', err);
+      setTranslationToast({
+        message: t.project.detailsSaveError,
+        type: 'error',
+      });
+      setTimeout(() => setTranslationToast(null), 3000);
+    } finally {
+      setIsSavingDetails(false);
+    }
+  };
+
   // Badge tactile pop animation key (increments on every row check)
   const [bumpKey, setBumpKey] = useState(0);
+
+  // Materials Card Collapsible State (open by default, collapses when done or overridden)
+  const [materialsOverride, setMaterialsOverride] = useState<boolean | undefined>(undefined);
+
+  // Scroll detection for compact floating reader bar
+  const [isScrolled, setIsScrolled] = useState(false);
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 30);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Raw Text Content (when source_type === 'text')
+  const [rawTextContent, setRawTextContent] = useState<string | null>(null);
+  const [isCopiedText, setIsCopiedText] = useState(false);
+
+  useEffect(() => {
+    if (tutorial.source_type === 'text' && !rawTextContent) {
+      if (signedUrl) {
+        fetch(signedUrl)
+          .then((res) => {
+            if (!res.ok) throw new Error('Failed to fetch text file from storage');
+            return res.text();
+          })
+          .then((text) => {
+            if (text && text.trim()) {
+              setRawTextContent(text);
+            }
+          })
+          .catch((err) => {
+            console.warn('[ProjectDetailView] Error fetching raw text from storage:', err);
+            if (tutorial.raw_content && !tutorial.raw_content.startsWith('hash:')) {
+              setRawTextContent(tutorial.raw_content);
+            }
+          });
+      } else if (tutorial.raw_content && !tutorial.raw_content.startsWith('hash:')) {
+        setRawTextContent(tutorial.raw_content);
+      }
+    }
+  }, [signedUrl, tutorial.source_type, tutorial.raw_content, rawTextContent]);
+
+  // Check if original document or text is viewable
+  const hasOriginalDocument = Boolean(
+    signedUrl ||
+    tutorial.source_type === 'text' ||
+    (tutorial.file_path && tutorial.file_path !== 'raw_text') ||
+    tutorial.note
+  );
 
   // Supplies checklist state
   const [checkedMaterials, setCheckedMaterials] = useState<Set<number>>(new Set());
@@ -272,11 +623,62 @@ export function ProjectDetailView({
       const next = new Set(prev);
       if (next.has(index)) {
         next.delete(index);
+        setMaterialsOverride(undefined);
       } else {
         next.add(index);
       }
       return next;
     });
+  };
+
+  // Multi-Language AI Translation State
+  const [currentLanguage, setCurrentLanguage] = useState<string>('original');
+  const [translationsCache, setTranslationsCache] = useState<Record<string, TranslatedPatternContent>>(initialTranslations);
+  const [isTranslating, setIsTranslating] = useState<boolean>(false);
+  const [translationToast, setTranslationToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState<boolean>(false);
+
+  const handleSelectLanguage = async (langCode: string) => {
+    setShowLanguageDropdown(false);
+    if (langCode === currentLanguage) return;
+
+    if (langCode === 'original') {
+      setCurrentLanguage('original');
+      return;
+    }
+
+    if (translationsCache[langCode]) {
+      setCurrentLanguage(langCode);
+      return;
+    }
+
+    setIsTranslating(true);
+    try {
+      const res = await getOrTranslatePatternAction(tutorial.id, langCode);
+      if (res.success && res.content) {
+        setTranslationsCache((prev) => ({
+          ...prev,
+          [langCode]: res.content,
+        }));
+        setCurrentLanguage(langCode);
+        setTranslationToast({
+          message: res.cached ? t.project.translationCachedBadge : t.project.translationSuccessToast,
+          type: 'success',
+        });
+        setTimeout(() => setTranslationToast(null), 3000);
+      } else {
+        throw new Error(res.error || t.project.translationErrorGeneric);
+      }
+    } catch (err: any) {
+      console.error('[Translation] Error:', err);
+      setTranslationToast({
+        message: err.message || t.project.translationErrorGeneric,
+        type: 'error',
+      });
+      setTimeout(() => setTranslationToast(null), 4000);
+    } finally {
+      setIsTranslating(false);
+    }
   };
 
   // User manual overrides for accordion expansion:
@@ -445,6 +847,8 @@ export function ProjectDetailView({
   const handleResetAll = () => {
     setItems((prev) => prev.map((i) => ({ ...i, checked: false })));
     setSectionOverrides({});
+    setCheckedMaterials(new Set());
+    setMaterialsOverride(undefined);
     setBumpKey((k) => k + 1);
 
     startTransition(async () => {
@@ -500,8 +904,25 @@ export function ProjectDetailView({
     }
   };
 
+  // Merge translated step labels & section names if active translation is selected
+  const activeTranslation = currentLanguage !== 'original' ? translationsCache[currentLanguage] : null;
+
+  const displayItems = activeTranslation
+    ? items.map((item) => {
+        const transStep = activeTranslation.steps.find((s) => s.order_index === item.order_index);
+        if (transStep) {
+          return {
+            ...item,
+            label: item.edited_by_user ? item.label : transStep.label,
+            section: transStep.section || item.section,
+          };
+        }
+        return item;
+      })
+    : items;
+
   // Group checklist items by section and automatically group pairs/multiples
-  const rawSectionsMap = items.reduce<Record<string, ChecklistItem[]>>((acc, item) => {
+  const rawSectionsMap = displayItems.reduce<Record<string, ChecklistItem[]>>((acc, item) => {
     const sec = item.section || t.project.sectionGeneral;
     if (!acc[sec]) acc[sec] = [];
     acc[sec].push(item);
@@ -588,9 +1009,16 @@ export function ProjectDetailView({
     processedSections.add(secName);
   });
 
-  const materialsList = (Array.isArray(tutorial.materials)
+  const rawMaterialsList = (Array.isArray(tutorial.materials)
     ? tutorial.materials
     : []) as TutorialMaterial[];
+
+  const materialsList = (activeTranslation?.materials && activeTranslation.materials.length > 0)
+    ? activeTranslation.materials
+    : rawMaterialsList;
+
+  // Active translated title (if translating)
+  const displayTitle = activeTranslation?.title || projectTitle;
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-8 pb-16 transition-all duration-300">
@@ -631,17 +1059,17 @@ export function ProjectDetailView({
 
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
-                <h1 className="text-sm sm:text-xl font-bold font-serif text-yarn-950 tracking-tight truncate max-w-[160px] sm:max-w-none">
-                  {tutorial.title}
+                <h1 className="text-sm sm:text-xl font-bold font-serif text-yarn-950 tracking-tight truncate max-w-[180px] sm:max-w-none">
+                  {displayTitle}
                 </h1>
                 {tutorial.project_type && (
                   <span className="hidden md:inline-block px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-yarn-100 text-yarn-800 border border-yarn-200 shrink-0">
-                    {tutorial.project_type}
+                    {(t.project.projectTypes as any)?.[tutorial.project_type.toLowerCase()] || tutorial.project_type}
                   </span>
                 )}
-                {tutorial.level && (
+                {projectLevel && (
                   <span className="hidden sm:inline-block px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-sage-100 text-sage-900 border border-sage-200 shrink-0">
-                    {(t.project.levels as any)?.[tutorial.level.toLowerCase()] || tutorial.level}
+                    {(t.project.levels as any)?.[projectLevel.toLowerCase()] || projectLevel}
                   </span>
                 )}
               </div>
@@ -660,8 +1088,103 @@ export function ProjectDetailView({
 
           {/* Right: Action Buttons */}
           <div className="flex items-center justify-end gap-2 shrink-0">
-            {/* Toggle PDF / Original Image button */}
-            {signedUrl && (
+            {/* Language & Technical Translation Switcher Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                disabled={isTranslating}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 ${
+                  currentLanguage !== 'original'
+                    ? 'bg-sage-100 text-sage-900 border-sage-300 shadow-xs'
+                    : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
+                }`}
+                title={t.project.translationTitle}
+              >
+                {isTranslating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-sage-700" />
+                ) : (
+                  <Globe className="w-3.5 h-3.5 text-sage-700" />
+                )}
+                <span className="hidden md:inline">
+                  {currentLanguage === 'original'
+                    ? 'Original'
+                    : (SUPPORTED_TRANSLATION_LANGUAGES.find((l) => l.code === currentLanguage)?.flag || '🌐') +
+                      ' ' +
+                      (SUPPORTED_TRANSLATION_LANGUAGES.find((l) => l.code === currentLanguage)?.code.toUpperCase() || '')}
+                </span>
+                <span className="md:hidden text-[11px]">
+                  {currentLanguage === 'original'
+                    ? '🌐'
+                    : (SUPPORTED_TRANSLATION_LANGUAGES.find((l) => l.code === currentLanguage)?.flag || '🌐')}
+                </span>
+                <ChevronDown className="w-3 h-3 text-yarn-500" />
+              </button>
+
+              {/* Floating Dropdown Menu */}
+              {showLanguageDropdown && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowLanguageDropdown(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-60 sm:w-64 rounded-2xl bg-white/98 backdrop-blur-xl border border-yarn-200 shadow-lift py-2 z-50 animate-fadeIn">
+                    <div className="px-3.5 py-1.5 text-[10px] font-bold text-yarn-500 uppercase tracking-wider border-b border-yarn-100">
+                      {t.project.translateTo}
+                    </div>
+
+                    {/* Original Option */}
+                    <button
+                      type="button"
+                      onClick={() => handleSelectLanguage('original')}
+                      className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-yarn-50 transition-colors ${
+                        currentLanguage === 'original' ? 'font-bold text-sage-900 bg-sage-50/80' : 'text-yarn-800'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>🌐</span>
+                        <span>{t.project.languageNames.original}</span>
+                      </span>
+                      {currentLanguage === 'original' && <Check className="w-3.5 h-3.5 text-sage-700" />}
+                    </button>
+
+                    <div className="h-px bg-yarn-100 my-1" />
+
+                    {/* Supported Languages */}
+                    {SUPPORTED_TRANSLATION_LANGUAGES.map((lang) => {
+                      const isSelected = currentLanguage === lang.code;
+                      const isCached = !!translationsCache[lang.code];
+                      return (
+                        <button
+                          key={lang.code}
+                          type="button"
+                          onClick={() => handleSelectLanguage(lang.code)}
+                          className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-yarn-50 transition-colors ${
+                            isSelected ? 'font-bold text-sage-900 bg-sage-50/80' : 'text-yarn-800'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2 truncate">
+                            <span className="shrink-0">{lang.flag}</span>
+                            <span className="truncate">
+                              {(t.project.languageNames as any)?.[lang.code] || `${lang.name} (${lang.nativeName})`}
+                            </span>
+                          </span>
+                          <span className="flex items-center gap-1.5 shrink-0">
+                            {isCached && !isSelected && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title={t.project.translationCachedBadge} />
+                            )}
+                            {isSelected && <Check className="w-3.5 h-3.5 text-sage-700" />}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Toggle PDF / Original Image / Original Text button */}
+            {hasOriginalDocument && (
               <button
                 type="button"
                 onClick={() => setShowOriginal(!showOriginal)}
@@ -673,13 +1196,29 @@ export function ProjectDetailView({
               >
                 {showOriginal ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 <span className="hidden md:inline">
-                  {showOriginal ? t.project.hideOriginal : t.project.viewOriginal}
+                  {showOriginal
+                    ? t.project.hideOriginal
+                    : tutorial.source_type === 'text'
+                    ? t.project.originalText
+                    : t.project.viewOriginal}
                 </span>
-                <span className="md:hidden text-[11px]">PDF</span>
+                <span className="md:hidden text-[11px] uppercase">
+                  {tutorial.source_type === 'pdf' ? 'PDF' : tutorial.source_type === 'text' ? 'Texte' : 'Image'}
+                </span>
               </button>
             )}
 
-            {/* Reset All Checkboxes Button */}
+            {/* Edit Project Details Button */}
+            <button
+              type="button"
+              onClick={openEditModal}
+              title={t.project.editDetails}
+              className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-yarn-100 border border-yarn-300 text-yarn-700 hover:text-yarn-950 transition-all shadow-2xs hover:scale-105 active:scale-95"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Reset All Checkboxes Button (Placed at the end as a reset/destructive action) */}
             <button
               type="button"
               onClick={handleResetAll}
@@ -690,6 +1229,21 @@ export function ProjectDetailView({
             </button>
           </div>
         </div>
+
+        {/* Description & Notes (integrated in progress card, automatically collapses when scrolling) */}
+        {projectNote && (
+          <div
+            className={`transition-all duration-300 ease-out overflow-hidden ${
+              isScrolled
+                ? 'max-h-0 opacity-0 my-0 py-0 pointer-events-none'
+                : 'max-h-96 opacity-100 pt-3 border-t border-yarn-100'
+            }`}
+          >
+            <p className="text-xs sm:text-sm text-yarn-700 leading-relaxed whitespace-pre-wrap">
+              {projectNote}
+            </p>
+          </div>
+        )}
 
         {/* Prominent Glow Progress Track */}
         <div className="w-full h-2 sm:h-3 rounded-full bg-yarn-100 overflow-hidden border border-yarn-200/90 shadow-inner p-0.5">
@@ -708,36 +1262,71 @@ export function ProjectDetailView({
       <div className={`grid gap-8 ${showOriginal ? 'lg:grid-cols-2 items-start' : 'grid-cols-1'}`}>
         {/* Checklist & Pattern Details Column */}
         <div className="space-y-8 w-full">
-          {/* Materials Checklist Card */}
-          {(materialsList.length > 0 || tutorial.stitch) && (
-            <div className="p-5 sm:p-6 rounded-3xl bg-white border border-yarn-200 shadow-soft space-y-4">
-              <div className="flex items-center justify-between gap-3 border-b border-yarn-100 pb-3 flex-wrap">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-sage-100 text-sage-800 flex items-center justify-center font-bold shrink-0">
-                    <Volleyball className="w-4 h-4" />
+          {/* Materials Checklist Card (Open by default, auto-collapses when done) */}
+          {(materialsList.length > 0 || projectStitch || tutorial.stitch) && (() => {
+            const isMaterialsDone = materialsList.length > 0 && checkedMaterials.size === materialsList.length;
+            const isMaterialsCollapsed = materialsOverride !== undefined
+              ? materialsOverride
+              : isMaterialsDone;
+
+            return (
+              <div
+                className={`rounded-3xl bg-white border border-yarn-200 shadow-soft transition-all duration-200 ${
+                  isMaterialsCollapsed ? 'p-4 sm:p-5' : 'p-5 sm:p-6 space-y-4'
+                }`}
+              >
+                <div
+                  onClick={() => setMaterialsOverride(!isMaterialsCollapsed)}
+                  className={`flex items-center justify-between gap-3 flex-wrap cursor-pointer select-none group ${
+                    isMaterialsCollapsed ? '' : 'border-b border-yarn-100 pb-3'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Volleyball className="w-4 h-4 text-sage-700 shrink-0" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base font-bold font-serif text-yarn-950 group-hover:text-sage-900 transition-colors">
+                          {t.project.materialsTitle}
+                        </h2>
+                        {isMaterialsDone && isMaterialsCollapsed && (
+                          <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 animate-in fade-in shrink-0">
+                            Prêt ✓
+                          </span>
+                        )}
+                        {!isMaterialsDone && isMaterialsCollapsed && materialsList.length > 0 && (
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-yarn-100 text-yarn-700">
+                            {checkedMaterials.size}/{materialsList.length}
+                          </span>
+                        )}
+                      </div>
+                      {materialsList.length > 0 && !isMaterialsCollapsed && (
+                        <p className="text-[11px] font-medium text-yarn-500">
+                          {checkedMaterials.size} / {materialsList.length} prêtes
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-base font-bold font-serif text-yarn-950">
-                      {t.project.materialsTitle}
-                    </h2>
-                    {materialsList.length > 0 && (
-                      <p className="text-[11px] font-medium text-yarn-500">
-                        {checkedMaterials.size} / {materialsList.length} prêtes
-                      </p>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {(projectStitch || tutorial.stitch) && (
+                      <div className="flex items-center gap-1.5 text-xs text-yarn-700 bg-yarn-50 px-3 py-1.5 rounded-xl border border-yarn-200 shadow-2xs shrink-0">
+                        <span className="font-semibold text-yarn-900">{t.project.materialsHook} :</span>
+                        <span className="font-mono font-bold text-sage-800">{projectStitch || tutorial.stitch}</span>
+                      </div>
                     )}
+
+                    <div className="p-1 text-yarn-400 group-hover:text-yarn-800 transition-colors">
+                      <ChevronDown
+                        className={`w-5 h-5 transition-transform duration-200 ${
+                          isMaterialsCollapsed ? '-rotate-90' : 'rotate-0'
+                        }`}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {tutorial.stitch && (
-                  <div className="flex items-center gap-1.5 text-xs text-yarn-700 bg-yarn-50 px-3 py-1.5 rounded-xl border border-yarn-200 shadow-2xs shrink-0">
-                    <span className="font-semibold text-yarn-900">{t.project.materialsHook} :</span>
-                    <span className="font-mono font-bold text-sage-800">{tutorial.stitch}</span>
-                  </div>
-                )}
-              </div>
-
-              {materialsList.length > 0 && (
-                <div className="space-y-2">
+              {!isMaterialsCollapsed && materialsList.length > 0 && (
+                <div className="space-y-2 animate-in fade-in duration-200">
                   {materialsList.map((m, idx) => {
                     const isChecked = checkedMaterials.has(idx);
                     return (
@@ -796,7 +1385,7 @@ export function ProjectDetailView({
                 </div>
               )}
             </div>
-          )}
+          ); })()}
 
           {/* Sectioned Checklist */}
           <div className="space-y-6">
@@ -826,10 +1415,8 @@ export function ProjectDetailView({
                           isCollapsed ? '' : 'border-b border-yarn-200/80 pb-3 sm:pb-4'
                         }`}
                       >
-                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-sage-100 text-sage-800 flex items-center justify-center font-bold shrink-0">
-                            <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </div>
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <Layers className="w-4 h-4 text-sage-700 shrink-0" />
                           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
                             <h2 className="text-sm sm:text-base lg:text-lg font-bold font-serif text-yarn-950 truncate">
                               {group.groupTitle}
@@ -1331,8 +1918,8 @@ export function ProjectDetailView({
           </div>
         </div>
 
-        {/* Desktop Side-by-Side PDF / Image Viewer (50% on Desktop, hidden on Mobile) */}
-        {signedUrl && (
+        {/* Desktop Side-by-Side PDF / Image / Text Viewer (50% on Desktop, hidden on Mobile) */}
+        {hasOriginalDocument && (
           <div
             className={`hidden ${
               showOriginal ? 'lg:flex' : 'lg:hidden'
@@ -1344,19 +1931,23 @@ export function ProjectDetailView({
                 <span>
                   {tutorial.source_type === 'pdf'
                     ? t.project.originalPdf
+                    : tutorial.source_type === 'text'
+                    ? t.project.originalText
                     : t.project.originalImages}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href={signedUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-sage-700 hover:text-sage-900 font-semibold"
-                >
-                  <span>{t.project.openInNewTab}</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                {signedUrl && (
+                  <a
+                    href={signedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-sage-700 hover:text-sage-900 font-semibold"
+                  >
+                    <span>{t.project.openInNewTab}</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowOriginal(false)}
@@ -1368,21 +1959,52 @@ export function ProjectDetailView({
               </div>
             </div>
 
-            <div className="flex-1 w-full bg-yarn-100 relative">
-              {tutorial.source_type === 'pdf' ? (
+            <div className="flex-1 w-full bg-yarn-100 relative overflow-hidden">
+              {tutorial.source_type === 'pdf' && signedUrl ? (
                 <iframe
                   src={`${signedUrl}#toolbar=0&navpanes=0`}
                   className="w-full h-full border-none"
                   title="PDF Viewer Desktop"
                 />
+              ) : tutorial.source_type === 'text' ? (
+                <div className="w-full h-full overflow-auto p-5 sm:p-6 bg-white flex flex-col">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-yarn-100 text-xs text-yarn-600">
+                    <span className="font-semibold text-yarn-800">{t.project.originalText}</span>
+                    {rawTextContent && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(rawTextContent);
+                          setIsCopiedText(true);
+                          setTimeout(() => setIsCopiedText(false), 2000);
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-sage-700 hover:text-sage-900 transition-colors px-2 py-1 rounded-lg hover:bg-yarn-50"
+                      >
+                        {isCopiedText ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{isCopiedText ? 'Copié !' : 'Copier'}</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex-1 font-mono text-xs sm:text-sm text-yarn-900 leading-relaxed whitespace-pre-wrap selection:bg-sage-200">
+                    {rawTextContent || (
+                      <div className="flex items-center justify-center h-48 text-yarn-500 gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-sage-600" />
+                        <span>Chargement du texte...</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : allImageUrls.length > 0 ? (
+                <ZoomableImageViewer
+                  allImageUrls={allImageUrls}
+                  currentImageIndex={currentImageIndex}
+                  setCurrentImageIndex={setCurrentImageIndex}
+                  title={tutorial.title}
+                />
               ) : (
-                <div className="w-full h-full overflow-auto p-4 flex items-center justify-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={signedUrl}
-                    alt={tutorial.title}
-                    className="max-w-full max-h-full object-contain rounded-xl shadow-soft"
-                  />
+                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-yarn-500 gap-3">
+                  <FileText className="w-10 h-10 text-yarn-400 stroke-1" />
+                  <p className="text-sm font-medium">Document original non disponible</p>
                 </div>
               )}
             </div>
@@ -1391,7 +2013,7 @@ export function ProjectDetailView({
       </div>
 
       {/* Mobile Slide-Up Bottom Sheet Drawer (Retains PDF page & scroll position permanently) */}
-      {signedUrl && (
+      {hasOriginalDocument && (
         <div
           className={`lg:hidden fixed inset-0 z-50 flex flex-col justify-end transition-all duration-300 ${
             showOriginal ? 'opacity-100 pointer-events-auto visible' : 'opacity-0 pointer-events-none invisible'
@@ -1423,19 +2045,23 @@ export function ProjectDetailView({
                 <span>
                   {tutorial.source_type === 'pdf'
                     ? t.project.originalPdf
+                    : tutorial.source_type === 'text'
+                    ? t.project.originalText
                     : t.project.originalImages}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href={signedUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-sage-700 hover:text-sage-900 font-semibold px-2.5 py-1 rounded-xl bg-sage-50 border border-sage-200 shadow-2xs"
-                >
-                  <span>{t.project.openInNewTab}</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+                {signedUrl && (
+                  <a
+                    href={signedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-sage-700 hover:text-sage-900 font-semibold px-2.5 py-1 rounded-xl bg-sage-50 border border-sage-200 shadow-2xs"
+                  >
+                    <span>{t.project.openInNewTab}</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowOriginal(false)}
@@ -1449,20 +2075,51 @@ export function ProjectDetailView({
 
             {/* Sheet Content Body */}
             <div className="flex-1 w-full bg-yarn-100 relative overflow-hidden">
-              {tutorial.source_type === 'pdf' ? (
+              {tutorial.source_type === 'pdf' && signedUrl ? (
                 <iframe
                   src={`${signedUrl}#toolbar=0&navpanes=0`}
                   className="w-full h-full border-none"
                   title="PDF Viewer Mobile"
                 />
+              ) : tutorial.source_type === 'text' ? (
+                <div className="w-full h-full overflow-auto p-5 bg-white flex flex-col">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-yarn-100 text-xs text-yarn-600">
+                    <span className="font-semibold text-yarn-800">{t.project.originalText}</span>
+                    {rawTextContent && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(rawTextContent);
+                          setIsCopiedText(true);
+                          setTimeout(() => setIsCopiedText(false), 2000);
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-sage-700 hover:text-sage-900 transition-colors px-2 py-1 rounded-lg hover:bg-yarn-50"
+                      >
+                        {isCopiedText ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{isCopiedText ? 'Copié !' : 'Copier'}</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex-1 font-mono text-xs text-yarn-900 leading-relaxed whitespace-pre-wrap selection:bg-sage-200">
+                    {rawTextContent || (
+                      <div className="flex items-center justify-center h-48 text-yarn-500 gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-sage-600" />
+                        <span>Chargement du texte...</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : allImageUrls.length > 0 ? (
+                <ZoomableImageViewer
+                  allImageUrls={allImageUrls}
+                  currentImageIndex={currentImageIndex}
+                  setCurrentImageIndex={setCurrentImageIndex}
+                  title={tutorial.title}
+                />
               ) : (
-                <div className="w-full h-full overflow-auto p-4 flex items-center justify-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={signedUrl}
-                    alt={tutorial.title}
-                    className="max-w-full max-h-full object-contain rounded-xl shadow-soft"
-                  />
+                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-yarn-500 gap-3">
+                  <FileText className="w-10 h-10 text-yarn-400 stroke-1" />
+                  <p className="text-sm font-medium">Document original non disponible</p>
                 </div>
               )}
             </div>
@@ -1484,6 +2141,143 @@ export function ProjectDetailView({
           <span>{t.project.deleteProject}</span>
         </button>
       </div>
+
+      {/* Floating Dynamic Translation Toast */}
+      {translationToast && (
+        <div className="fixed bottom-6 right-6 z-50 animate-bounce-short pointer-events-auto">
+          <div
+            className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-lift text-xs font-bold border backdrop-blur-xl ${
+              translationToast.type === 'success'
+                ? 'bg-sage-900/95 text-white border-sage-700 shadow-sage-900/30'
+                : 'bg-red-900/95 text-white border-red-700 shadow-red-900/30'
+            }`}
+          >
+            {translationToast.type === 'success' ? (
+              <Sparkles className="w-4 h-4 text-sage-300 animate-spin" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-red-300" />
+            )}
+            <span>{translationToast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Project Details Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-yarn-950/60 backdrop-blur-sm transition-opacity"
+            onClick={() => !isSavingDetails && setIsEditModalOpen(false)}
+          />
+
+          <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 sm:p-7 shadow-lift border border-yarn-200 z-10 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-yarn-100 pb-3">
+              <div>
+                <h3 className="text-lg font-bold font-serif text-yarn-950">
+                  {t.project.editDetailsTitle}
+                </h3>
+                <p className="text-xs text-yarn-500 mt-0.5">
+                  {t.project.editDetailsDesc}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isSavingDetails && setIsEditModalOpen(false)}
+                className="p-1.5 rounded-xl text-yarn-400 hover:text-yarn-700 hover:bg-yarn-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDetails} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-yarn-900">
+                  {t.project.titleLabel} *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editTitleInput}
+                  onChange={(e) => setEditTitleInput(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-yarn-900">
+                  {t.project.descriptionLabel}
+                </label>
+                <textarea
+                  rows={4}
+                  value={editNoteInput}
+                  onChange={(e) => setEditNoteInput(e.target.value)}
+                  placeholder={t.project.descriptionPlaceholder}
+                  className="w-full p-3.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs placeholder:text-yarn-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-yarn-900">
+                    {t.project.hookLabel}
+                  </label>
+                  <input
+                    type="text"
+                    value={editStitchInput}
+                    onChange={(e) => setEditStitchInput(e.target.value)}
+                    placeholder="Ex: 3.5 mm"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-yarn-900">
+                    {t.project.levelLabel}
+                  </label>
+                  <select
+                    value={editLevelInput}
+                    onChange={(e) => setEditLevelInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-yarn-300 bg-white text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 shadow-2xs"
+                  >
+                    <option value="">{t.library.allLevels}</option>
+                    <option value="beginner">{(t.project.levels as any)?.beginner || 'Débutant'}</option>
+                    <option value="intermediate">{(t.project.levels as any)?.intermediate || 'Intermédiaire'}</option>
+                    <option value="advanced">{(t.project.levels as any)?.advanced || 'Avancé'}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-yarn-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  disabled={isSavingDetails}
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-yarn-700 hover:bg-yarn-100 border border-yarn-200 transition-colors"
+                >
+                  {t.project.cancelEdit}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingDetails || !editTitleInput.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-sage-800 hover:bg-sage-900 disabled:opacity-50 transition-all shadow-soft"
+                >
+                  {isSavingDetails ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>{t.project.savingDetails}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>{t.project.saveDetails}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (

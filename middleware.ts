@@ -14,7 +14,8 @@ export const config = {
      * - favicon.ico (favicon file)
      * - robots.txt, sitemap.xml
      * - public assets (.svg, .png, .jpg, etc.)
+     * - api/ (API routes handle their own session & streaming)
      */
-    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

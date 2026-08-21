@@ -17,32 +17,32 @@ interface DemoItem {
 const INITIAL_ITEMS: DemoItem[] = [
   {
     id: '1',
-    original: 'Rnd 1: 6 sc in magic ring [6]',
+    original: 'Round 1: 6 sc in magic ring [6]',
     translated: 'Tour 1 : 6 ms dans un CM [6]',
     checked: true,
   },
   {
     id: '2',
-    original: 'Rnd 2: [inc] x 6 [12]',
+    original: 'Round 2: [inc] x 6 [12]',
     translated: 'Tour 2 : [1 aug] x 6 [12]',
     checked: true,
   },
   {
     id: '3',
-    original: 'Rnd 3: [1 sc, inc] x 6 [18]',
+    original: 'Round 3: [1 sc, inc] x 6 [18]',
     translated: 'Tour 3 : [1 ms, 1 aug] x 6 [18]',
     checked: false,
     note: 'DEFAULT_NOTE',
   },
   {
     id: '4',
-    original: 'Rnd 4: [2 sc, inc] x 6 [24]',
+    original: 'Round 4: [2 sc, inc] x 6 [24]',
     translated: 'Tour 4 : [2 ms, 1 aug] x 6 [24]',
     checked: false,
   },
   {
     id: '5',
-    original: 'Rnd 5-8: sc around (4 rounds) [24]',
+    original: 'Rounds 5-8: sc around (4 rounds) [24]',
     translated: 'Tours 5-8 : 1 ms dans chaque m (4 tours) [24]',
     checked: false,
   },

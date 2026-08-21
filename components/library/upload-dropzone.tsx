@@ -31,6 +31,67 @@ interface UploadDropzoneProps {
   quota?: QuotaCheckResult;
 }
 
+/**
+ * Optimizes photos before upload to ensure fast transfer and prevent multipart payload errors.
+ */
+async function optimizeImageForUpload(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) return file;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      img.onload = () => {
+        const MAX_DIM = 2000;
+        let { width, height } = img;
+
+        if (width > MAX_DIM) {
+          height = Math.round((height * MAX_DIM) / width);
+          width = MAX_DIM;
+        }
+        if (height > MAX_DIM) {
+          width = Math.round((width * MAX_DIM) / height);
+          height = MAX_DIM;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+                const safeName = cleanName.toLowerCase().endsWith('.jpg') || cleanName.toLowerCase().endsWith('.jpeg')
+                  ? cleanName
+                  : `${cleanName}.jpg`;
+                const optimizedFile = new File([blob], safeName, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                resolve(optimizedFile);
+                return;
+              }
+              resolve(file);
+            },
+            'image/jpeg',
+            0.85
+          );
+          return;
+        }
+        resolve(file);
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
 export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
   const { t } = useI18n();
   const router = useRouter();
@@ -93,7 +154,16 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
   const addFiles = (newFiles: File[]) => {
     setErrorMessage(null);
     const MAX_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+    const MAX_IMAGES_COUNT = 20;
 
+    if (selectedFiles.length + newFiles.length > MAX_IMAGES_COUNT) {
+      setErrorMessage(t.upload.maxImagesExceeded);
+      return;
+    }
+
+    const existingSignatures = new Set(
+      selectedFiles.map((f) => `${f.file.name}_${f.file.size}_${f.file.lastModified}`)
+    );
     const validPreviews: FilePreview[] = [];
 
     for (const file of newFiles) {
@@ -101,6 +171,12 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
         setErrorMessage(t.upload.fileTooLarge);
         return;
       }
+
+      const sig = `${file.name}_${file.size}_${file.lastModified}`;
+      if (existingSignatures.has(sig)) {
+        continue; // Prevent adding duplicate image inside the same pattern batch
+      }
+      existingSignatures.add(sig);
 
       const isImage = file.type.startsWith('image/');
       validPreviews.push({
@@ -169,9 +245,10 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
       const formData = new FormData();
 
       if (activeTab === 'file') {
-        selectedFiles.forEach(({ file }) => {
-          formData.append('files', file);
-        });
+        for (const { file } of selectedFiles) {
+          const optimizedFile = await optimizeImageForUpload(file);
+          formData.append('files', optimizedFile);
+        }
       } else {
         formData.append('rawText', rawText);
       }
@@ -215,7 +292,21 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
       }
 
       if (!response.ok || !data.success) {
-        throw new Error(data.message || t.upload.errorGeneric);
+        if (data.error === 'BAD_REQUEST') {
+          setErrorMessage(t.upload.errorParseFiles);
+        } else if (data.error === 'MAX_IMAGES_EXCEEDED') {
+          setErrorMessage(t.upload.maxImagesExceeded);
+        } else if (data.error === 'PAYLOAD_TOO_LARGE') {
+          setErrorMessage(t.upload.errorPayloadTooLarge);
+        } else if (data.error === 'RATE_LIMITED') {
+          setErrorMessage(t.upload.abnormalActivityError);
+        } else {
+          setErrorMessage(t.upload.errorGeneric);
+        }
+        setIsSubmitting(false);
+        clearTimeout(stepTimer1);
+        clearTimeout(stepTimer2);
+        return;
       }
       
       // Clean up previews
@@ -235,7 +326,7 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
       // Navigate to newly created interactive pattern project
       router.push(`/library/${data.tutorialId}`);
     } catch (err: any) {
-      setErrorMessage(err.message || t.upload.errorGeneric);
+      setErrorMessage(t.upload.errorGeneric);
       setIsSubmitting(false);
       clearTimeout(stepTimer1);
       clearTimeout(stepTimer2);
@@ -590,7 +681,7 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
               </div>
 
               {/* Patience / Loading Notice */}
-              <div className="pt-3 border-t border-sage-200/80 flex items-start gap-2.5 text-xs text-sage-900 bg-sage-100/70 p-3 rounded-2xl">
+              <div className="flex items-start gap-3 text-xs text-yarn-700 bg-sage-100/70 border border-sage-200/60 p-3.5 rounded-2xl">
                 <Clock className="w-4 h-4 text-sage-700 shrink-0 mt-0.5" />
                 <p className="leading-relaxed font-normal">
                   {t.upload.patientNotice}
