@@ -1197,7 +1197,9 @@ export function ProjectDetailView({
                 {showOriginal ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 <span className="hidden md:inline">
                   {showOriginal
-                    ? t.project.hideOriginal
+                    ? tutorial.source_type === 'text'
+                      ? t.project.hideOriginalText
+                      : t.project.hideOriginal
                     : tutorial.source_type === 'text'
                     ? t.project.originalText
                     : t.project.viewOriginal}
