@@ -1110,69 +1110,59 @@ export function ProjectDetailView({
         }`}
       >
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3.5">
-          {/* Left: Quick Back + Project Title + Badges + Counters */}
-          <div className="flex items-center justify-between gap-2.5 sm:gap-3.5 min-w-0 flex-1">
-            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
-              <Link
-                href="/library"
-                title={t.project.backToLibrary}
-                className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl sm:rounded-2xl bg-yarn-100/80 hover:bg-yarn-200 text-yarn-800 hover:text-yarn-950 transition-all shrink-0 inline-flex items-center justify-center border border-yarn-200/90 shadow-2xs hover:scale-105 active:scale-95 p-0 cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Link>
+          {/* Left: Quick Back + Badges above Title + Project Title + Counters */}
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
+            <Link
+              href="/library"
+              title={t.project.backToLibrary}
+              className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl sm:rounded-2xl bg-yarn-100/80 hover:bg-yarn-200 text-yarn-800 hover:text-yarn-950 transition-all shrink-0 inline-flex items-center justify-center border border-yarn-200/90 shadow-2xs hover:scale-105 active:scale-95 p-0 cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Link>
 
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
-                  <h1 className="text-sm sm:text-xl font-bold font-serif text-yarn-950 tracking-tight truncate max-w-[150px] xs:max-w-[200px] sm:max-w-none">
-                    {displayTitle}
-                  </h1>
-                  {/* Desktop Badges beside title */}
-                  {projectType && (
-                    <CategoryBadge
-                      category={projectType}
-                      label={(t.project.projectTypes as any)?.[projectType.toLowerCase()] || projectType}
-                      className="hidden sm:inline-flex"
-                    />
-                  )}
-                  {projectLevel && (
-                    <LevelBadge
-                      level={projectLevel}
-                      label={(t.project.levels as any)?.[projectLevel.toLowerCase()] || projectLevel}
-                      className="hidden sm:inline-flex"
-                    />
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-semibold text-yarn-600">
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <h1 className="text-sm sm:text-xl font-bold font-serif text-yarn-950 tracking-tight truncate">
+                  {displayTitle}
+                </h1>
+
+                {/* Compact Icon-Only Category & Level Badges */}
+                {projectType && (
                   <span
-                    className={`truncate font-bold ${isAllDone
-                      ? 'text-emerald-700'
-                      : progressPercent > 0
-                        ? 'text-orange-500'
-                        : 'text-rose-600'
-                      }`}
+                    title={(t.project.projectTypes as any)?.[projectType.toLowerCase()] || projectType}
+                    className={`h-6 w-6 rounded-lg inline-flex items-center justify-center border shadow-2xs shrink-0 ${getCategoryStyle(projectType).badgeClass}`}
                   >
-                    {completedCount} / {totalItems} {t.project.roundsCompleted}
+                    <CategoryIcon
+                      category={projectType}
+                      className={`w-3.5 h-3.5 ${getCategoryStyle(projectType).iconColor}`}
+                    />
                   </span>
-                </div>
+                )}
+                {projectLevel && (
+                  <span
+                    title={(t.project.levels as any)?.[projectLevel.toLowerCase()] || projectLevel}
+                    className={`h-6 w-6 rounded-lg inline-flex items-center justify-center border shadow-2xs shrink-0 ${getLevelStyle(projectLevel).badgeClass}`}
+                  >
+                    <LevelIcon
+                      level={projectLevel}
+                      className={`w-3.5 h-3.5 ${getLevelStyle(projectLevel).iconColor}`}
+                    />
+                  </span>
+                )}
               </div>
-            </div>
 
-            {/* Mobile Top-Right Badges (Category & Level stacked vertically) */}
-            <div className="flex flex-col items-end gap-1 shrink-0 sm:hidden">
-              {projectType && (
-                <CategoryBadge
-                  category={projectType}
-                  label={(t.project.projectTypes as any)?.[projectType.toLowerCase()] || projectType}
-                  className="h-5 px-2 text-[9px]"
-                />
-              )}
-              {projectLevel && (
-                <LevelBadge
-                  level={projectLevel}
-                  label={(t.project.levels as any)?.[projectLevel.toLowerCase()] || projectLevel}
-                  className="h-5 px-2 text-[9px]"
-                />
-              )}
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-semibold text-yarn-600">
+                <span
+                  className={`truncate font-bold ${isAllDone
+                    ? 'text-emerald-700'
+                    : progressPercent > 0
+                      ? 'text-orange-500'
+                      : 'text-rose-600'
+                    }`}
+                >
+                  {completedCount} / {totalItems} {t.project.roundsCompleted}
+                </span>
+              </div>
             </div>
           </div>
 
