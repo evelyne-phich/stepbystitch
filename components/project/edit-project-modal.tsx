@@ -262,36 +262,45 @@ export function EditProjectModal({
   const isDisplayingVisual = (hasImagePreview || hasPdfPreview) && !isCoverDeleted;
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] bg-yarn-950/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      {/* Backdrop */}
       <div
-        className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-yarn-200 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 relative z-10"
+        onClick={onClose}
+        className="fixed inset-0 bg-yarn-950/65 backdrop-blur-xs animate-in fade-in transition-opacity"
+      />
+
+      {/* Responsive Drawer on mobile / Centered Modal on desktop */}
+      <div
+        className="relative w-full sm:max-w-lg max-h-[90vh] sm:max-h-[85vh] bg-white rounded-t-[28px] sm:rounded-3xl border-t sm:border border-yarn-200 shadow-2xl overflow-hidden flex flex-col z-10 animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
-        <div className="p-4 sm:p-6 border-b border-yarn-100 flex items-center justify-between bg-yarn-50/50 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-sage-100 text-sage-800 flex items-center justify-center shadow-2xs">
-              <Edit2 className="w-4 h-4" />
+        {/* Modal / Drawer Header */}
+        <div className="p-4 sm:p-6 border-b border-yarn-100 bg-gradient-to-br from-yarn-50 via-white to-sage-50/40 shrink-0">
+          {/* Mobile Handle Bar */}
+          <div className="w-10 h-1 rounded-full bg-yarn-300 mx-auto mb-3 sm:hidden shrink-0" />
+
+          <div className="flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-sage-100 text-sage-800 flex items-center justify-center shadow-2xs shrink-0">
+                <Edit2 className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-base font-bold text-yarn-950 font-serif truncate">
+                  {t.project.editDetailsTitle}
+                </h3>
+                <p className="text-[11px] text-yarn-500 hidden sm:block truncate">
+                  {t.project.editDetailsDesc}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-base font-bold text-yarn-950 font-serif">
-                {t.project.editDetailsTitle}
-              </h3>
-              <p className="text-[11px] text-yarn-500 hidden sm:block">
-                {t.project.editDetailsDesc}
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-8 w-8 rounded-xl hover:bg-yarn-200/60 text-yarn-500 hover:text-yarn-800 transition-colors flex items-center justify-center cursor-pointer shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-8 w-8 rounded-xl hover:bg-yarn-200/60 text-yarn-500 hover:text-yarn-800 transition-colors flex items-center justify-center cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
         </div>
 
         {/* Modal Form Body */}
@@ -483,8 +492,8 @@ export function EditProjectModal({
               />
             </div>
 
-            {/* Category & Level Dropdowns */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Category & Level Dropdowns (50/50 side-by-side on mobile and desktop) */}
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5">
               {/* Category Dropdown */}
               <div ref={categoryDropdownRef} className="space-y-1.5 relative">
                 <label className="text-xs font-bold text-yarn-900 flex items-center gap-1.5">
@@ -523,7 +532,7 @@ export function EditProjectModal({
                   </button>
 
                   {showCategoryDropdown && (
-                    <div className="absolute left-0 mt-1.5 w-full rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn">
+                    <div className="absolute left-0 bottom-full mb-1.5 w-full rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
                       <div className="space-y-0.5 max-h-56 overflow-y-auto">
                         {EDIT_CATEGORY_OPTIONS.map((opt) => {
                           const isSelected = (editProjectType || '').toLowerCase() === opt.key.toLowerCase();
@@ -595,7 +604,7 @@ export function EditProjectModal({
                   </button>
 
                   {showLevelDropdown && (
-                    <div className="absolute left-0 mt-1.5 w-full rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn">
+                    <div className="absolute left-0 bottom-full mb-1.5 w-full rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
                       <div className="space-y-0.5 max-h-56 overflow-y-auto">
                         {EDIT_LEVEL_OPTIONS.map((opt) => {
                           const isSelected = (editLevel || '').toLowerCase() === opt.key.toLowerCase();

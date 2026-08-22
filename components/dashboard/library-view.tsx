@@ -383,22 +383,22 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
             />
           </div>
 
-          {/* Dropdown Filters (Level + Category) */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Dropdown Filters (Level + Category - 50/50 side-by-side on mobile, inline on desktop) */}
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2.5 w-full sm:w-auto shrink-0">
             {/* Custom Level Filter Dropdown */}
-            <div ref={levelDropdownRef} className="relative flex-1 sm:flex-initial">
+            <div ref={levelDropdownRef} className="relative min-w-0">
               <button
                 type="button"
                 onClick={() => {
                   setShowCategoryDropdown(false);
                   setShowLevelDropdown((prev) => !prev);
                 }}
-                className={`w-full sm:w-auto h-10 inline-flex items-center justify-between sm:justify-start gap-1.5 px-3.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer ${filterLevel !== 'all'
+                className={`w-full sm:w-auto h-10 inline-flex items-center justify-between sm:justify-start gap-1.5 px-3 sm:px-3.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer ${filterLevel !== 'all'
                     ? `${getLevelStyle(filterLevel).badgeClass} shadow-xs`
                     : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
                   }`}
               >
-                <div className="flex items-center gap-1.5 truncate">
+                <div className="flex items-center gap-1.5 min-w-0 truncate">
                   <LevelIcon
                     level={filterLevel !== 'all' ? filterLevel : null}
                     className={`w-3.5 h-3.5 shrink-0 ${filterLevel !== 'all' ? getLevelStyle(filterLevel).iconColor : 'text-sage-700'}`}
@@ -413,7 +413,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
               </button>
 
               {showLevelDropdown && (
-                <div className="absolute left-0 mt-2 w-full sm:w-48 rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn">
+                <div className="absolute left-0 mt-2 w-48 max-w-[85vw] sm:w-48 rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                   <div className="px-2.5 py-1 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
                     {t.project.levelLabel || 'Niveau'}
                   </div>
@@ -449,19 +449,19 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
             </div>
 
             {/* Custom Category / Project Type Filter Dropdown */}
-            <div ref={categoryDropdownRef} className="relative flex-1 sm:flex-initial">
+            <div ref={categoryDropdownRef} className="relative min-w-0">
               <button
                 type="button"
                 onClick={() => {
                   setShowLevelDropdown(false);
                   setShowCategoryDropdown((prev) => !prev);
                 }}
-                className={`w-full sm:w-auto h-10 inline-flex items-center justify-between sm:justify-start gap-1.5 px-3.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer ${filterCategory !== 'all'
+                className={`w-full sm:w-auto h-10 inline-flex items-center justify-between sm:justify-start gap-1.5 px-3 sm:px-3.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer ${filterCategory !== 'all'
                     ? `${getCategoryStyle(filterCategory).badgeClass} shadow-xs`
                     : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
                   }`}
               >
-                <div className="flex items-center gap-1.5 truncate">
+                <div className="flex items-center gap-1.5 min-w-0 truncate">
                   <CategoryIcon
                     category={filterCategory !== 'all' ? filterCategory : null}
                     className={`w-3.5 h-3.5 shrink-0 ${filterCategory !== 'all' ? getCategoryStyle(filterCategory).iconColor : 'text-sage-700'}`}
@@ -476,7 +476,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
               </button>
 
               {showCategoryDropdown && (
-                <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-full sm:w-52 rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-fadeIn">
+                <div className="absolute right-0 sm:left-auto sm:right-0 mt-2 w-52 max-w-[85vw] sm:w-52 rounded-2xl bg-white border border-yarn-200 shadow-2xl p-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                   <div className="px-2.5 py-1 text-[10px] font-bold text-yarn-400 uppercase tracking-wider">
                     {t.library.filterCategoryLabel || 'Catégorie'}
                   </div>
