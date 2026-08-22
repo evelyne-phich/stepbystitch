@@ -15,6 +15,7 @@ import {
   deleteTutorial,
 } from '@/app/(dashboard)/library/[id]/actions';
 import { Toast } from '@/components/ui/toast';
+import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { EditProjectModal, type EditProjectModalSavedData } from '@/components/project/edit-project-modal';
 import type { TutorialWithProgress } from '@/lib/types/database';
 
@@ -393,7 +394,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                   setShowCategoryDropdown(false);
                   setShowLevelDropdown((prev) => !prev);
                 }}
-                className={`w-full sm:w-auto h-10 inline-flex items-center justify-between sm:justify-start gap-1.5 px-3 sm:px-3.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer ${filterLevel !== 'all'
+                className={`w-full sm:w-auto h-10 inline-flex items-center justify-between sm:justify-start gap-1.5 px-3 sm:px-3.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs sm:hover:scale-105 active:scale-95 cursor-pointer ${filterLevel !== 'all'
                     ? `${getLevelStyle(filterLevel).badgeClass} shadow-xs`
                     : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
                   }`}
@@ -456,7 +457,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                   setShowLevelDropdown(false);
                   setShowCategoryDropdown((prev) => !prev);
                 }}
-                className={`w-full sm:w-auto h-10 inline-flex items-center justify-between sm:justify-start gap-1.5 px-3 sm:px-3.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer ${filterCategory !== 'all'
+                className={`w-full sm:w-auto h-10 inline-flex items-center justify-between sm:justify-start gap-1.5 px-3 sm:px-3.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs sm:hover:scale-105 active:scale-95 cursor-pointer ${filterCategory !== 'all'
                     ? `${getCategoryStyle(filterCategory).badgeClass} shadow-xs`
                     : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
                   }`}
@@ -606,7 +607,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
 
           <Link
             href="/library/new"
-            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-sage-800 to-sage-600 hover:from-sage-900 hover:to-sage-700 shadow-lift transition-transform transform hover:-translate-y-0.5"
+            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl text-sm font-bold text-white bg-sage-800 hover:bg-sage-900 shadow-soft hover:shadow-md transition-all duration-300 ease-out cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>{t.library.importFirst}</span>
@@ -724,7 +725,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                             e.stopPropagation();
                             openEditModal(tutorial);
                           }}
-                          className="h-7 w-7 rounded-lg bg-yarn-50 hover:bg-yarn-100 text-yarn-600 hover:text-yarn-900 border border-yarn-200/80 shadow-2xs flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95"
+                          className="h-7 w-7 rounded-lg bg-yarn-50 hover:bg-yarn-100 text-yarn-600 hover:text-yarn-900 border border-yarn-200/80 shadow-2xs flex items-center justify-center cursor-pointer transition-all sm:hover:scale-105 active:scale-95"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
@@ -737,7 +738,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                             e.stopPropagation();
                             setDeletingProjectTutorial(tutorial);
                           }}
-                          className="h-7 w-7 rounded-lg bg-yarn-50 hover:bg-rose-50 text-yarn-600 hover:text-rose-600 border border-yarn-200/80 hover:border-rose-200 shadow-2xs flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95"
+                          className="h-7 w-7 rounded-lg bg-yarn-50 hover:bg-rose-50 text-yarn-600 hover:text-rose-600 border border-yarn-200/80 hover:border-rose-200 shadow-2xs flex items-center justify-center cursor-pointer transition-all sm:hover:scale-105 active:scale-95"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1021,6 +1022,9 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
         type="success"
         onClose={() => setToastMessage(null)}
       />
+
+      {/* Floating Scroll To Top Button */}
+      <ScrollToTop threshold={350} />
     </div>
   );
 }

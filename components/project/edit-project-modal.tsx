@@ -373,7 +373,7 @@ export function EditProjectModal({
                       type="button"
                       title={t.project.changeCoverImage}
                       onClick={() => fileInputRef.current?.click()}
-                      className="h-8 w-8 rounded-xl bg-white/95 hover:bg-white text-sage-700 hover:text-sage-800 border border-sage-200/90 shadow-2xs flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+                      className="h-8 w-8 rounded-xl bg-white/95 hover:bg-white text-sage-700 hover:text-sage-800 border border-sage-200/90 shadow-2xs flex items-center justify-center cursor-pointer sm:hover:scale-105 active:scale-95 transition-transform"
                     >
                       <Upload className="w-3.5 h-3.5 text-sage-700" />
                     </button>
@@ -384,7 +384,7 @@ export function EditProjectModal({
                         type="button"
                         title={t.project.restoreOriginalCover}
                         onClick={handleRestoreOriginal}
-                        className="h-8 w-8 rounded-xl bg-white/95 hover:bg-white text-yarn-800 hover:text-yarn-950 border border-yarn-200/90 shadow-2xs flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+                        className="h-8 w-8 rounded-xl bg-white/95 hover:bg-white text-yarn-800 hover:text-yarn-950 border border-yarn-200/90 shadow-2xs flex items-center justify-center cursor-pointer sm:hover:scale-105 active:scale-95 transition-transform"
                       >
                         <RotateCcw className="w-3.5 h-3.5 text-sage-700" />
                       </button>
@@ -400,7 +400,7 @@ export function EditProjectModal({
                         setIsCoverDeleted(true);
                         setIsCoverRestored(false);
                       }}
-                      className="h-8 w-8 rounded-xl bg-white/95 hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200/90 shadow-2xs flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+                      className="h-8 w-8 rounded-xl bg-white/95 hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200/90 shadow-2xs flex items-center justify-center cursor-pointer sm:hover:scale-105 active:scale-95 transition-transform"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -511,7 +511,7 @@ export function EditProjectModal({
                       setShowLevelDropdown(false);
                       setShowCategoryDropdown((prev) => !prev);
                     }}
-                    className={`w-full inline-flex items-center justify-between gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
+                    className={`w-full inline-flex items-center justify-between gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all shadow-2xs sm:hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
                       editProjectType
                         ? `${getCategoryStyle(editProjectType).badgeClass} shadow-xs`
                         : 'bg-white text-yarn-800 hover:bg-yarn-50 border-yarn-300'
@@ -583,7 +583,7 @@ export function EditProjectModal({
                       setShowCategoryDropdown(false);
                       setShowLevelDropdown((prev) => !prev);
                     }}
-                    className={`w-full inline-flex items-center justify-between gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all shadow-2xs hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
+                    className={`w-full inline-flex items-center justify-between gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border transition-all shadow-2xs sm:hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
                       editLevel
                         ? `${getLevelStyle(editLevel).badgeClass} shadow-xs`
                         : 'bg-white text-yarn-800 hover:bg-yarn-50 border-yarn-300'
@@ -641,13 +641,13 @@ export function EditProjectModal({
           </form>
         </div>
 
-        {/* Modal Footer */}
-        <div className="p-4 sm:p-6 border-t border-yarn-100 bg-yarn-50/50 flex items-center justify-end gap-2.5 shrink-0">
+        {/* Modal / Drawer Footer (50/50 Annuler / Enregistrer) */}
+        <div className="p-4 sm:p-6 border-t border-yarn-100 bg-yarn-50/50 grid grid-cols-2 gap-2.5 sm:gap-3 shrink-0">
           <button
             type="button"
             disabled={isSaving}
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold text-yarn-700 hover:bg-yarn-100 border border-yarn-200 transition-colors cursor-pointer"
+            className="w-full inline-flex items-center justify-center px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold text-yarn-700 hover:text-yarn-900 bg-white hover:bg-yarn-100/80 border border-yarn-200 shadow-2xs transition-all sm:hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
           >
             {t.project.cancelEdit}
           </button>
@@ -655,7 +655,7 @@ export function EditProjectModal({
             type="submit"
             form="edit-project-modal-form"
             disabled={isSaving || !editTitle.trim()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-sage-800 hover:bg-sage-900 disabled:opacity-50 transition-all shadow-soft cursor-pointer"
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-sage-800 hover:bg-sage-900 disabled:opacity-50 transition-all shadow-soft sm:hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
           >
             {isSaving ? (
               <>

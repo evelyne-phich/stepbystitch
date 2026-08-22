@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Sparkles, Menu, X, Layers, HelpCircle, CreditCard, Plus } from 'lucide-react';
 import { useAuth } from '@/lib/supabase/hooks';
 import { LanguageSwitcher } from '@/components/ui/language-switcher';
@@ -12,6 +13,8 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, loading } = useAuth();
   const { t } = useI18n();
+  const pathname = usePathname();
+  const isImportPage = pathname === '/library/new';
 
   return (
     <header className="sticky top-0 z-50 w-full backdrop-blur-md bg-yarn-50/95 border-b border-yarn-200/80 transition-all">
@@ -68,18 +71,20 @@ export function Navbar() {
 
             {!loading && user ? (
               <div className="flex items-center gap-2.5">
-                <Link
-                  href="/library/new"
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-sage-800 to-sage-600 hover:from-sage-900 hover:to-sage-700 shadow-soft hover:shadow-lift transition-all transform hover:-translate-y-0.5 whitespace-nowrap"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>{t.common.importPattern}</span>
-                </Link>
+                {!isImportPage && (
+                  <Link
+                    href="/library/new"
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-sage-800 hover:bg-sage-900 shadow-soft hover:shadow-md transition-all duration-300 ease-out whitespace-nowrap cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{t.common.importPattern}</span>
+                  </Link>
+                )}
                 <Link
                   href="/library"
-                  className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-yarn-800 bg-white border border-yarn-200 hover:border-yarn-400 hover:bg-yarn-50 hover:text-yarn-950 shadow-2xs hover:shadow-soft transition-all transform hover:-translate-y-0.5 active:scale-[0.98] whitespace-nowrap"
+                  className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-yarn-800 bg-white border border-yarn-200 hover:border-yarn-400 hover:bg-yarn-50 hover:text-yarn-950 shadow-2xs transition-colors whitespace-nowrap"
                 >
-                  <Layers className="w-4 h-4 text-yarn-600 group-hover:text-yarn-900 group-hover:scale-110 transition-transform duration-200" />
+                  <Layers className="w-4 h-4 text-yarn-600 group-hover:text-yarn-900 transition-colors" />
                   <span>{t.common.myLibrary}</span>
                 </Link>
               </div>
@@ -93,7 +98,7 @@ export function Navbar() {
                 </Link>
                 <Link
                   href="/signup"
-                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-sage-800 to-sage-600 hover:from-sage-900 hover:to-sage-700 shadow-soft hover:shadow-lift transition-all transform hover:-translate-y-0.5 whitespace-nowrap"
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-sage-800 to-sage-600 hover:from-sage-900 hover:to-sage-700 shadow-soft transition-colors whitespace-nowrap"
                 >
                   <span>{t.common.signup}</span>
                 </Link>
@@ -156,14 +161,16 @@ export function Navbar() {
           <div className="pt-4 mt-2 border-t border-yarn-200 flex flex-col gap-2.5">
             {!loading && user ? (
               <>
-                <Link
-                  href="/library/new"
-                  onClick={() => setIsOpen(false)}
-                  className="w-full text-center py-3 rounded-xl font-bold text-white bg-gradient-to-r from-sage-800 to-sage-600 shadow-soft flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>{t.common.importPattern}</span>
-                </Link>
+                {!isImportPage && (
+                  <Link
+                    href="/library/new"
+                    onClick={() => setIsOpen(false)}
+                    className="w-full text-center py-3 rounded-xl font-bold text-white bg-sage-800 hover:bg-sage-900 shadow-soft hover:shadow-md transition-all duration-300 ease-out flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{t.common.importPattern}</span>
+                  </Link>
+                )}
                 <Link
                   href="/library"
                   onClick={() => setIsOpen(false)}

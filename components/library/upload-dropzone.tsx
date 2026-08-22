@@ -678,7 +678,7 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
           {isBlocked ? (
             <Link
               href="/#tarifs"
-              className="w-full py-4 px-6 rounded-2xl text-base font-bold text-white bg-sage-800 hover:bg-sage-900 shadow-soft flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-95"
+              className="w-full py-4 px-6 rounded-2xl text-base font-bold text-white bg-sage-800 hover:bg-sage-900 shadow-soft flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <Lock className="w-5 h-5 text-emerald-300" />
               <span>{t.upload.quotaBlockedButton}</span>
@@ -688,9 +688,9 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`w-full py-4 px-6 rounded-2xl text-base font-bold text-white shadow-lift flex items-center justify-center gap-2 transition-all transform ${isSubmitting
+              className={`w-full py-4 px-6 rounded-2xl text-base font-bold text-white shadow-soft hover:shadow-md flex items-center justify-center gap-2 transition-all duration-300 ease-out cursor-pointer ${isSubmitting
                   ? 'bg-yarn-400 cursor-not-allowed opacity-90'
-                  : 'bg-gradient-to-r from-sage-800 via-sage-700 to-sage-600 hover:from-sage-900 hover:to-sage-700 hover:-translate-y-0.5 shadow-soft hover:shadow-lift'
+                  : 'bg-sage-800 hover:bg-sage-900'
                 }`}
             >
               {isSubmitting ? (
