@@ -129,18 +129,18 @@ export async function updateTutorialDetails(
 
   const isEditingTranslation = updates.targetLanguage && updates.targetLanguage !== 'original';
 
-  // 1. Update universal project attributes on the tutorials table
+  // 1. Update universal project attributes on the tutorials table (including universal notes)
   const tutorialFieldsToUpdate: Record<string, any> = {
+    note: updates.note ? updates.note.trim() : null,
     stitch: updates.stitch ? updates.stitch.trim() : null,
     level: updates.level ? updates.level.trim() : null,
     project_type: updates.project_type ? updates.project_type.trim() : null,
     updated_at: new Date().toISOString(),
   };
 
-  // If editing the original pattern, update master title and note
+  // If editing the original pattern, update master title
   if (!isEditingTranslation) {
     tutorialFieldsToUpdate.title = updates.title.trim();
-    tutorialFieldsToUpdate.note = updates.note ? updates.note.trim() : null;
   }
 
   const { error } = await (supabase.from('tutorials') as any)
@@ -529,7 +529,8 @@ export async function deleteTutorial(tutorialId: string) {
  */
 export async function getOrTranslatePatternAction(
   tutorialId: string,
-  targetLanguage: string
+  targetLanguage: string,
+  forceRefresh: boolean = false
 ): Promise<{
   success: boolean;
   cached: boolean;
@@ -549,20 +550,22 @@ export async function getOrTranslatePatternAction(
   }
 
   try {
-    // 2. Check if translation is already cached in Supabase
-    const { data: existingTranslation } = await (supabase.from('translations') as any)
-      .select('content, status')
-      .eq('tutorial_id', tutorialId)
-      .eq('target_language', targetLanguage)
-      .single();
+    // 2. Check if translation is already cached in Supabase (if not forced to refresh)
+    if (!forceRefresh) {
+      const { data: existingTranslation } = await (supabase.from('translations') as any)
+        .select('content, status')
+        .eq('tutorial_id', tutorialId)
+        .eq('target_language', targetLanguage)
+        .single();
 
-    if (existingTranslation && existingTranslation.status === 'done' && existingTranslation.content) {
-      console.log(`[Action getOrTranslatePattern] ⚡ Cache HIT for tutorial ${tutorialId} (${targetLanguage})`);
-      return {
-        success: true,
-        cached: true,
-        content: existingTranslation.content,
-      };
+      if (existingTranslation && existingTranslation.status === 'done' && existingTranslation.content) {
+        console.log(`[Action getOrTranslatePattern] ⚡ Cache HIT for tutorial ${tutorialId} (${targetLanguage})`);
+        return {
+          success: true,
+          cached: true,
+          content: existingTranslation.content,
+        };
+      }
     }
 
     // 3. Rate limiting check (max 5 requests per minute per user)

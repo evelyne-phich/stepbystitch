@@ -78,6 +78,18 @@ interface ProjectDetailViewProps {
   initialTranslations?: Record<string, TranslatedPatternContent>;
 }
 
+const TUTORIAL_CARD_LABELS: Record<string, { materials: string; hook: string }> = {
+  fr: { materials: 'Matériel', hook: 'Taille de crochet' },
+  en_us: { materials: 'Materials', hook: 'Hook size' },
+  en_uk: { materials: 'Materials', hook: 'Hook size' },
+  en: { materials: 'Materials', hook: 'Hook size' },
+  es: { materials: 'Materiales', hook: 'Tamaño de ganchillo' },
+  de: { materials: 'Material', hook: 'Häkelnadelgröße' },
+  pt: { materials: 'Materiais', hook: 'Tamanho da agulha' },
+  ru: { materials: 'Материалы', hook: 'Размер крючка' },
+  zh: { materials: '材料与工具', hook: '钩针型号' },
+};
+
 /**
  * Visual badge for the total stitch count of a row (e.g. [18]).
  */
@@ -457,15 +469,20 @@ export function ProjectDetailView({
 
   const [currentLanguage, setCurrentLanguage] = useState<string>(initialPreferredLanguage);
 
-  // Pattern Content Language & Dictionary:
-  // All texts on the tutorial page (headers, materials, hook size, notes, checklist, and actions)
-  // take the language of the tutorial (active pattern language).
+  // Pattern Content Language & Card Labels:
   const sourceLang = getSourceLanguageInfo(tutorial.raw_content_language);
   const activePatternLang = currentLanguage === 'original' ? sourceLang.code : currentLanguage;
   const isPatternEnglish = activePatternLang === 'en' || activePatternLang === 'en_us' || activePatternLang === 'en_uk';
   const isPatternFrench = activePatternLang === 'fr';
 
-  const t = isPatternEnglish ? en : isPatternFrench ? fr : (locale === 'en' ? en : appDict);
+  // App UI Dictionary (follows user navigation locale):
+  const t = locale === 'en' ? en : appDict;
+
+  // Pattern Tutorial Card Labels (follows active pattern language):
+  const cardLabels =
+    TUTORIAL_CARD_LABELS[activePatternLang] ||
+    TUTORIAL_CARD_LABELS[locale] ||
+    TUTORIAL_CARD_LABELS.fr;
 
   const [items, setItems] = useState<ChecklistItem[]>(initialItems);
   const [currentCoverUrl, setCurrentCoverUrl] = useState<string | null>(initialCoverImageUrl);
@@ -563,9 +580,11 @@ export function ProjectDetailView({
   };
 
   const handleProjectModalSaved = (data: EditProjectModalSavedData) => {
+    // Description is universal for the entire project
+    setProjectNote(data.note || '');
+
     if (currentLanguage === 'original') {
       setProjectTitle(data.title);
-      setProjectNote(data.note || '');
     } else {
       setTranslationsCache((prev) => {
         if (!prev[currentLanguage]) return prev;
@@ -678,16 +697,16 @@ export function ProjectDetailView({
   const [translationToast, setTranslationToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState<boolean>(false);
 
-  const handleSelectLanguage = async (langCode: string) => {
+  const handleSelectLanguage = async (langCode: string, forceRefresh: boolean = false) => {
     setShowLanguageDropdown(false);
-    if (langCode === currentLanguage) return;
+    if (langCode === currentLanguage && !forceRefresh) return;
 
     if (langCode === 'original') {
       setCurrentLanguage('original');
       return;
     }
 
-    if (translationsCache[langCode]) {
+    if (translationsCache[langCode] && !forceRefresh) {
       setCurrentLanguage(langCode);
       return;
     }
@@ -699,7 +718,7 @@ export function ProjectDetailView({
     });
 
     try {
-      const res = await getOrTranslatePatternAction(tutorial.id, langCode);
+      const res = await getOrTranslatePatternAction(tutorial.id, langCode, forceRefresh);
       if (res.success && res.content) {
         setTranslationsCache((prev) => ({
           ...prev,
@@ -1278,14 +1297,29 @@ export function ProjectDetailView({
                                     {(t.project.languageNames as any)?.[lang.code] || lang.nativeName}
                                   </span>
                                 </span>
-                                <span className="flex items-center gap-1 shrink-0 ml-1.5">
+                                <span className="flex items-center gap-1.5 shrink-0 ml-1.5">
                                   {isCached && !isSelected && (
                                     <span
                                       className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-2xs"
                                       title={t.project.translationCachedBadge}
                                     />
                                   )}
-                                  {isSelected && <Check className="w-3.5 h-3.5 text-sage-700" />}
+                                  {isSelected && (
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleSelectLanguage(lang.code, true);
+                                        }}
+                                        title={t.project.retranslatePattern}
+                                        className="p-1 rounded-md text-yarn-400 hover:text-sage-800 hover:bg-yarn-200/60 transition-colors"
+                                      >
+                                        <RotateCcw className="w-3 h-3" />
+                                      </button>
+                                      <Check className="w-3.5 h-3.5 text-sage-700" />
+                                    </div>
+                                  )}
                                 </span>
                               </button>
                             );
@@ -1551,7 +1585,7 @@ export function ProjectDetailView({
                 className="h-8 flex items-center gap-1 bg-white px-2 rounded-xl border border-sage-500 shadow-soft shrink-0 animate-in fade-in"
               >
                 <span className="text-xs font-semibold text-yarn-700 shrink-0">
-                  {t.project.materialsHook} :
+                  {cardLabels.hook} :
                 </span>
                 <input
                   ref={hookInputRef}
@@ -1602,7 +1636,7 @@ export function ProjectDetailView({
                 title="Modifier la taille du crochet"
                 className="group/hook h-8 inline-flex items-center gap-1.5 text-xs text-yarn-700 bg-yarn-50 hover:bg-sage-50 px-2.5 sm:px-3 rounded-xl border border-yarn-200 hover:border-sage-300 shadow-2xs shrink-0 cursor-pointer transition-colors"
               >
-                <span className="font-semibold text-yarn-900">{t.project.materialsHook} :</span>
+                <span className="font-semibold text-yarn-900">{cardLabels.hook} :</span>
                 <span className="font-mono font-bold text-sage-800">
                   {projectStitch || tutorial.stitch || '—'}
                 </span>
@@ -1629,7 +1663,7 @@ export function ProjectDetailView({
                       </div>
                       <div>
                         <h2 className="text-base font-bold font-serif text-yarn-950 group-hover:text-sage-900 transition-colors truncate">
-                          {t.project.materialsTitle}
+                          {cardLabels.materials}
                         </h2>
                       </div>
                     </div>
@@ -2551,7 +2585,7 @@ export function ProjectDetailView({
       <GlossaryModal
         isOpen={showGlossaryModal}
         onClose={() => setShowGlossaryModal(false)}
-        language={isPatternEnglish ? 'en' : 'fr'}
+        language={activePatternLang}
       />
 
       {/* Floating Scroll To Top Button */}

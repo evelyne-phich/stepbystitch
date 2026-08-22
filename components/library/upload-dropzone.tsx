@@ -112,10 +112,6 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
   // Raw text state
   const [rawText, setRawText] = useState('');
 
-  // Details
-  const [customTitle, setCustomTitle] = useState('');
-  const [customNote, setCustomNote] = useState('');
-
   // Loading & Progress
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -251,13 +247,6 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
         }
       } else {
         formData.append('rawText', rawText);
-      }
-
-      if (customTitle.trim()) {
-        formData.append('title', customTitle.trim());
-      }
-      if (customNote.trim()) {
-        formData.append('note', customNote.trim());
       }
 
       const response = await fetch('/api/parse-pattern', {
@@ -575,43 +564,6 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
             <p className="text-[11px] text-yarn-500">{t.upload.textHint}</p>
           </div>
         )}
-
-        {/* OPTIONAL PROJECT DETAILS */}
-        <div className="p-6 rounded-3xl bg-white border border-yarn-200 shadow-soft space-y-4">
-          <h4 className="text-sm font-bold font-serif text-yarn-900">
-            {t.upload.detailsTitle}
-          </h4>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-yarn-700">
-              {t.upload.patternTitleLabel}
-            </label>
-            <input
-              type="text"
-              value={customTitle}
-              disabled={isBlocked || isSubmitting}
-              onChange={(e) => setCustomTitle(e.target.value)}
-              placeholder={t.upload.patternTitlePlaceholder}
-              className={`w-full px-4 py-2.5 rounded-xl border border-yarn-200 bg-yarn-50 text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 ${isBlocked || isSubmitting ? 'opacity-60 cursor-not-allowed' : 'placeholder:text-yarn-400'
-                }`}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-yarn-700">
-              {t.upload.patternNoteLabel}
-            </label>
-            <textarea
-              rows={2}
-              value={customNote}
-              disabled={isBlocked || isSubmitting}
-              onChange={(e) => setCustomNote(e.target.value)}
-              placeholder={t.upload.patternNotePlaceholder}
-              className={`w-full p-3 rounded-xl border border-yarn-200 bg-yarn-50 text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 ${isBlocked || isSubmitting ? 'opacity-60 cursor-not-allowed' : 'placeholder:text-yarn-400'
-                }`}
-            />
-          </div>
-        </div>
 
         {/* SUBMIT BUTTON & PROGRESS */}
         <div className="space-y-4 pt-2" ref={submitSectionRef}>
