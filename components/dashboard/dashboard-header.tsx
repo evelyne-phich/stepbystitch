@@ -10,10 +10,9 @@ import { CrochetLogo } from '@/components/ui/crochet-logo';
 
 interface DashboardHeaderProps {
   userName?: string;
-  userLang?: string;
 }
 
-export function DashboardHeader({ userName, userLang = 'fr' }: DashboardHeaderProps) {
+export function DashboardHeader({ userName }: DashboardHeaderProps) {
   const { t } = useI18n();
   const pathname = usePathname();
 
@@ -64,11 +63,8 @@ export function DashboardHeader({ userName, userLang = 'fr' }: DashboardHeaderPr
               </div>
               {userName && (
                 <div className="hidden lg:flex flex-col text-left">
-                  <span className="text-xs font-semibold text-yarn-900 leading-tight">
+                  <span className="text-xs font-semibold text-yarn-900 leading-tight truncate max-w-[140px]">
                     {userName}
-                  </span>
-                  <span className="text-[11px] text-yarn-500 uppercase">
-                    {t.library.langPrefix}: {userLang.toUpperCase()}
                   </span>
                 </div>
               )}

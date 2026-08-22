@@ -127,21 +127,15 @@ export async function updateTutorialDetails(
     throw new Error('Unauthorized');
   }
 
-  const isEditingTranslation = updates.targetLanguage && updates.targetLanguage !== 'original';
-
-  // 1. Update universal project attributes on the tutorials table (including universal notes)
+  // 1. Update universal project attributes on the tutorials table (including universal title & notes)
   const tutorialFieldsToUpdate: Record<string, any> = {
+    title: updates.title.trim(),
     note: updates.note ? updates.note.trim() : null,
     stitch: updates.stitch ? updates.stitch.trim() : null,
     level: updates.level ? updates.level.trim() : null,
     project_type: updates.project_type ? updates.project_type.trim() : null,
     updated_at: new Date().toISOString(),
   };
-
-  // If editing the original pattern, update master title
-  if (!isEditingTranslation) {
-    tutorialFieldsToUpdate.title = updates.title.trim();
-  }
 
   const { error } = await (supabase.from('tutorials') as any)
     .update(tutorialFieldsToUpdate)
@@ -153,32 +147,32 @@ export async function updateTutorialDetails(
     throw new Error('Failed to update project details');
   }
 
-  // 2. If editing a specific translation, update ONLY that language's title and note
-  if (isEditingTranslation && updates.targetLanguage) {
-    try {
-      const { data: trRow } = await (supabase.from('translations') as any)
-        .select('id, content')
-        .eq('tutorial_id', tutorialId)
-        .eq('target_language', updates.targetLanguage)
-        .single();
+  // 2. Synchronize title and note across all cached translations for this tutorial
+  try {
+    const { data: translations } = await (supabase.from('translations') as any)
+      .select('id, content')
+      .eq('tutorial_id', tutorialId);
 
-      if (trRow && trRow.content && typeof trRow.content === 'object') {
-        const updatedContent = {
-          ...trRow.content,
-          title: updates.title.trim(),
-          note: updates.note ? updates.note.trim() : null,
-        };
+    if (translations && translations.length > 0) {
+      for (const trRow of translations) {
+        if (trRow && trRow.content && typeof trRow.content === 'object') {
+          const updatedContent = {
+            ...trRow.content,
+            title: updates.title.trim(),
+            note: updates.note ? updates.note.trim() : null,
+          };
 
-        await (supabase.from('translations') as any)
-          .update({
-            content: updatedContent,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', trRow.id);
+          await (supabase.from('translations') as any)
+            .update({
+              content: updatedContent,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', trRow.id);
+        }
       }
-    } catch (trErr) {
-      console.warn('[Action updateTutorialDetails] Error updating specific translation:', trErr);
     }
+  } catch (trErr) {
+    console.warn('[Action updateTutorialDetails] Error syncing translations:', trErr);
   }
 
   revalidatePath(`/library/${tutorialId}`);

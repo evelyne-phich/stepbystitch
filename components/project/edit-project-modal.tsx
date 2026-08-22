@@ -35,6 +35,7 @@ export interface EditProjectModalSavedData {
   isOriginalPdf?: boolean;
   cover_image_path?: string | null;
   hasCustomCover?: boolean;
+  targetLanguage?: string;
 }
 
 interface EditProjectModalProps {
@@ -52,6 +53,7 @@ interface EditProjectModalProps {
   originalDocUrl?: string | null;
   isOriginalPdf?: boolean;
   targetLanguage?: string;
+  sourceLanguage?: string;
   onSaved: (data: EditProjectModalSavedData) => void;
 }
 
@@ -70,6 +72,7 @@ export function EditProjectModal({
   originalDocUrl = null,
   isOriginalPdf = false,
   targetLanguage = 'original',
+  sourceLanguage = 'fr',
   onSaved,
 }: EditProjectModalProps) {
   const { t } = useI18n();
@@ -219,6 +222,7 @@ export function EditProjectModal({
         isOriginalPdf,
         cover_image_path: updatedCoverPath,
         hasCustomCover: updatedHasCustomCover,
+        targetLanguage,
       });
 
       onClose();

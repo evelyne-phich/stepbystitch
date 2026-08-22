@@ -240,7 +240,17 @@ STRUCTURE & EXECUTION MANDATES:
 4. TRANSLATE MATERIALS AND SECTIONS:
    Translate the title, materials names/details, and section titles into the target language completely.
 
-5. OUTPUT VALID STRUCTURED JSON:
+5. NATURAL WORD ORDER & IDIOMATIC TITLE TRANSLATIONS:
+   - When translating titles and project names to French (or Spanish/Portuguese), respect natural target language grammar and word order (Noun + Qualitative Adjective):
+     - "Cute Bunny" ➔ "Lapin mignon" (STRICTLY FORBIDDEN: "Mignon Lapin")
+     - "Cute Bear" / "Cute Fox" ➔ "Ours mignon" / "Renard mignon"
+     - "Sleepy Cat" ➔ "Chat endormi" (STRICTLY FORBIDDEN: "Endormi Chat")
+     - "Fluffy Dog" ➔ "Chien duveteux"
+     - "Little Bunny" / "Mini Bunny" ➔ "Petit Lapin" / "Mini Lapin"
+     - "Bunny in Pajamas" ➔ "Lapin en pyjama"
+   - Never use English adjective-first word order for qualitative adjectives in French.
+
+6. OUTPUT VALID STRUCTURED JSON:
    Adhere strictly to the requested JSON schema.`;
 
 const CROCHET_TRANSLATION_JSON_SCHEMA = {

@@ -45,9 +45,10 @@ export async function updateSession(request: NextRequest) {
 
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup');
   const isDashboardRoute = request.nextUrl.pathname.startsWith('/library') || request.nextUrl.pathname.startsWith('/settings');
+  const isHomeRoute = request.nextUrl.pathname === '/';
 
-  // If user is already authenticated and visits login/signup, redirect to library
-  if (user && isAuthRoute) {
+  // If user is already authenticated and visits home (/), login, or signup -> redirect directly to library
+  if (user && (isAuthRoute || isHomeRoute)) {
     const url = request.nextUrl.clone();
     url.pathname = '/library';
     return NextResponse.redirect(url);

@@ -9,12 +9,11 @@ export default async function DashboardLayout({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const userName = user?.user_metadata?.full_name
-  const userLang = user?.user_metadata?.langue_preferee || 'fr';
+  const userName = user?.user_metadata?.full_name;
 
   return (
     <div className="min-h-screen flex flex-col bg-yarn-50 overflow-x-clip w-full">
-      <DashboardHeader userName={userName} userLang={userLang} />
+      <DashboardHeader userName={userName} />
 
       {/* Main dashboard container */}
       <main className="flex-1 py-4 sm:py-8 lg:py-12 w-full">

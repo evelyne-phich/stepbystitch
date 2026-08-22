@@ -17,6 +17,7 @@ import {
 import { Toast } from '@/components/ui/toast';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
 import { EditProjectModal, type EditProjectModalSavedData } from '@/components/project/edit-project-modal';
+import { SUPPORTED_TRANSLATION_LANGUAGES } from '@/lib/ai/translator';
 import type { TutorialWithProgress } from '@/lib/types/database';
 
 interface LibraryViewProps {
@@ -201,23 +202,36 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
   const handleProjectModalSaved = (data: EditProjectModalSavedData) => {
     if (!editingTutorial) return;
     setTutorials((prev) =>
-      prev.map((t) =>
-        t.id === editingTutorial.id
-          ? {
-              ...t,
+      prev.map((t) => {
+        if (t.id !== editingTutorial.id) return t;
+
+        let updatedTranslations = t.translations;
+        if (Array.isArray(t.translations)) {
+          updatedTranslations = t.translations.map((tr) => ({
+            ...tr,
+            content: {
+              ...(typeof tr.content === 'object' && tr.content ? tr.content : {}),
               title: data.title,
               note: data.note,
-              level: data.level,
-              project_type: data.project_type,
-              coverImageUrl: data.coverImageUrl,
-              coverPdfUrl: data.coverPdfUrl !== undefined ? data.coverPdfUrl : t.coverPdfUrl,
-              originalDocUrl: data.originalDocUrl !== undefined ? data.originalDocUrl : t.originalDocUrl,
-              isOriginalPdf: data.isOriginalPdf !== undefined ? data.isOriginalPdf : t.isOriginalPdf,
-              cover_image_path: data.cover_image_path,
-              hasCustomCover: data.hasCustomCover ?? t.hasCustomCover,
-            }
-          : t
-      )
+            },
+          }));
+        }
+
+        return {
+          ...t,
+          title: data.title,
+          note: data.note,
+          level: data.level,
+          project_type: data.project_type,
+          coverImageUrl: data.coverImageUrl,
+          coverPdfUrl: data.coverPdfUrl !== undefined ? data.coverPdfUrl : t.coverPdfUrl,
+          originalDocUrl: data.originalDocUrl !== undefined ? data.originalDocUrl : t.originalDocUrl,
+          isOriginalPdf: data.isOriginalPdf !== undefined ? data.isOriginalPdf : t.isOriginalPdf,
+          cover_image_path: data.cover_image_path,
+          hasCustomCover: data.hasCustomCover ?? t.hasCustomCover,
+          translations: updatedTranslations,
+        };
+      })
     );
     setToastMessage(t.project.detailsSavedToast);
     setTimeout(() => setToastMessage(null), 3000);
@@ -283,13 +297,33 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
   const completedCount = filteredByLevelAndCategory.filter((t) => !!t.isCompleted).length;
 
   const getLocalizedTutorialData = (tutorial: TutorialWithProgress) => {
-    const targetLang = locale === 'fr' ? 'fr' : 'en_us';
+    const targetLang = locale === 'fr' ? 'fr' : (locale === 'en' ? 'en_us' : locale);
     const matchingTrans = tutorial.translations?.find(
       (tr) => tr.target_language === targetLang || (locale === 'en' && tr.target_language === 'en_uk')
     );
     const title = (matchingTrans?.content as any)?.title || tutorial.title;
-    const note = (matchingTrans?.content as any)?.note || tutorial.note;
-    return { title, note };
+    // Description is the crafter's universal note from tutorials table
+    const note = tutorial.note ?? (matchingTrans?.content as any)?.note ?? null;
+
+    const sourceCode = tutorial.raw_content_language || 'fr';
+    const isTranslated = !!matchingTrans && matchingTrans.target_language !== sourceCode;
+    const sourceLangInfo = SUPPORTED_TRANSLATION_LANGUAGES.find((l) => l.code === sourceCode) || {
+      code: sourceCode as any,
+      name: sourceCode.toUpperCase(),
+      nativeName: sourceCode.toUpperCase(),
+      flag: '🌐',
+    };
+    const sourceLangName = (t.project.languageNames as any)?.[sourceCode] || sourceLangInfo.nativeName;
+    const translatedFromText = (t.project.translatedFromLanguage as any)?.[sourceCode] || `${t.library.translatedFrom} ${sourceLangName}`;
+
+    return {
+      title,
+      note,
+      isTranslated,
+      sourceLangName,
+      sourceLangFlag: sourceLangInfo.flag,
+      translatedFromText,
+    };
   };
 
   const matchesSearch = (tutorial: TutorialWithProgress, query: string): boolean => {
@@ -395,8 +429,8 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                   setShowLevelDropdown((prev) => !prev);
                 }}
                 className={`w-full sm:w-auto h-10 inline-flex items-center justify-between sm:justify-start gap-1.5 px-3 sm:px-3.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs sm:hover:scale-105 active:scale-95 cursor-pointer ${filterLevel !== 'all'
-                    ? `${getLevelStyle(filterLevel).badgeClass} shadow-xs`
-                    : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
+                  ? `${getLevelStyle(filterLevel).badgeClass} shadow-xs`
+                  : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
                   }`}
               >
                 <div className="flex items-center gap-1.5 min-w-0 truncate">
@@ -458,8 +492,8 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                   setShowCategoryDropdown((prev) => !prev);
                 }}
                 className={`w-full sm:w-auto h-10 inline-flex items-center justify-between sm:justify-start gap-1.5 px-3 sm:px-3.5 rounded-2xl text-xs font-bold border transition-all shadow-2xs sm:hover:scale-105 active:scale-95 cursor-pointer ${filterCategory !== 'all'
-                    ? `${getCategoryStyle(filterCategory).badgeClass} shadow-xs`
-                    : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
+                  ? `${getCategoryStyle(filterCategory).badgeClass} shadow-xs`
+                  : 'bg-white text-yarn-800 hover:bg-yarn-100 border-yarn-300'
                   }`}
               >
                 <div className="flex items-center gap-1.5 min-w-0 truncate">
@@ -520,8 +554,8 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
             type="button"
             onClick={() => setFilterStatus('all')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs text-center flex items-center justify-center gap-1.5 cursor-pointer ${filterStatus === 'all'
-                ? 'bg-yarn-900 text-white shadow-soft'
-                : 'bg-white text-yarn-700 border border-yarn-200 hover:bg-yarn-50 hover:border-yarn-300'
+              ? 'bg-yarn-900 text-white shadow-soft'
+              : 'bg-white text-yarn-700 border border-yarn-200 hover:bg-yarn-50 hover:border-yarn-300'
               }`}
           >
             <span>{t.library.filterAll}</span>
@@ -535,8 +569,8 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
             type="button"
             onClick={() => setFilterStatus('not_started')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all shadow-2xs text-center flex items-center justify-center gap-1.5 cursor-pointer ${filterStatus === 'not_started'
-                ? 'bg-rose-800 text-white border-rose-800 shadow-soft'
-                : 'bg-white text-rose-800 border border-rose-200/80 hover:bg-rose-50'
+              ? 'bg-rose-800 text-white border-rose-800 shadow-soft'
+              : 'bg-white text-rose-800 border border-rose-200/80 hover:bg-rose-50'
               }`}
           >
             <Circle className={`w-2 h-2 shrink-0 ${filterStatus === 'not_started' ? 'fill-white text-white' : 'text-rose-500 fill-rose-500/30'}`} />
@@ -555,8 +589,8 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
             type="button"
             onClick={() => setFilterStatus('in_progress')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all shadow-2xs text-center flex items-center justify-center gap-1.5 cursor-pointer ${filterStatus === 'in_progress'
-                ? 'bg-orange-500 text-white border-orange-500 shadow-soft'
-                : 'bg-white text-orange-600 border border-orange-200 hover:bg-orange-50'
+              ? 'bg-orange-500 text-white border-orange-500 shadow-soft'
+              : 'bg-white text-orange-600 border border-orange-200 hover:bg-orange-50'
               }`}
           >
             <Sparkles className="w-2.5 h-2.5 shrink-0" />
@@ -571,8 +605,8 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
             type="button"
             onClick={() => setFilterStatus('completed')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all shadow-2xs text-center flex items-center justify-center gap-1.5 cursor-pointer ${filterStatus === 'completed'
-                ? 'bg-emerald-800 text-white border-emerald-800 shadow-soft'
-                : 'bg-white text-emerald-800 border border-emerald-200 hover:bg-emerald-50'
+              ? 'bg-emerald-800 text-white border-emerald-800 shadow-soft'
+              : 'bg-white text-emerald-800 border border-emerald-200 hover:bg-emerald-50'
               }`}
           >
             <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
@@ -619,17 +653,17 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
             const isCompleted = tutorial.isCompleted;
             const progress = tutorial.progressPercent || 0;
             const isNotStarted = (tutorial.completedSteps || 0) === 0 && !isCompleted;
-            const { title: displayTitle, note: displayNote } = getLocalizedTutorialData(tutorial);
+            const { title: displayTitle, note: displayNote, isTranslated, sourceLangName, sourceLangFlag } = getLocalizedTutorialData(tutorial);
 
             return (
               <Link
                 key={tutorial.id}
                 href={`/library/${tutorial.id}`}
                 className={`group bg-white rounded-3xl p-4 sm:p-5 border shadow-soft hover:shadow-lift transition-all flex flex-col justify-between h-full ${isCompleted
-                    ? 'border-emerald-200/90 hover:border-emerald-400 ring-1 ring-emerald-500/10'
-                    : isNotStarted
-                      ? 'border-yarn-200 hover:border-rose-300'
-                      : 'border-yarn-200 hover:border-orange-300'
+                  ? 'border-emerald-200/90 hover:border-emerald-400 ring-1 ring-emerald-500/10'
+                  : isNotStarted
+                    ? 'border-yarn-200 hover:border-rose-300'
+                    : 'border-yarn-200 hover:border-orange-300'
                   }`}
               >
                 {/* Top Content Area */}
@@ -704,46 +738,56 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                     )}
                   </div>
 
-                    {/* Metadata Row: Category Badge on left + Edit & Delete Buttons on right */}
-                    <div className="flex items-center justify-between gap-2 pt-0.5 shrink-0">
-                      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                        {tutorial.project_type && (
-                          <CategoryBadge
-                            category={tutorial.project_type}
-                            label={(t.project.projectTypes as any)?.[tutorial.project_type.toLowerCase()] || tutorial.project_type}
-                          />
-                        )}
-                      </div>
-
-                      {/* Quick Edit ✏️ & Delete 🗑️ Action Buttons */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          title={t.library.editProject}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openEditModal(tutorial);
-                          }}
-                          className="h-7 w-7 rounded-lg bg-yarn-50 hover:bg-yarn-100 text-yarn-600 hover:text-yarn-900 border border-yarn-200/80 shadow-2xs flex items-center justify-center cursor-pointer transition-all sm:hover:scale-105 active:scale-95"
+                  {/* Metadata Row: Category Badge & Translated From badge on left + Edit & Delete Buttons on right */}
+                  <div className="flex items-center justify-between gap-2 pt-0.5 shrink-0">
+                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                      {tutorial.project_type && (
+                        <CategoryBadge
+                          category={tutorial.project_type}
+                          label={(t.project.projectTypes as any)?.[tutorial.project_type.toLowerCase()] || tutorial.project_type}
+                        />
+                      )}
+                      {sourceLangName && (
+                        <span
+                          title={`${t.library.originalLanguageBadge} ${sourceLangFlag} ${sourceLangName}`}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold text-yarn-600 bg-yarn-100/90 border border-yarn-200 shadow-2xs shrink-0"
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          type="button"
-                          title={t.library.deleteProject}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setDeletingProjectTutorial(tutorial);
-                          }}
-                          className="h-7 w-7 rounded-lg bg-yarn-50 hover:bg-rose-50 text-yarn-600 hover:text-rose-600 border border-yarn-200/80 hover:border-rose-200 shadow-2xs flex items-center justify-center cursor-pointer transition-all sm:hover:scale-105 active:scale-95"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                          <span className="text-yarn-500 font-medium">{t.library.originalLanguageBadge}</span>
+                          <span className="text-[11px] leading-none">{sourceLangFlag}</span>
+                          <span className="truncate max-w-[130px] font-bold text-yarn-700">{sourceLangName}</span>
+                        </span>
+                      )}
                     </div>
+
+                    {/* Quick Edit ✏️ & Delete 🗑️ Action Buttons */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        title={t.library.editProject}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openEditModal(tutorial);
+                        }}
+                        className="h-7 w-7 rounded-lg bg-yarn-50 hover:bg-yarn-100 text-yarn-600 hover:text-yarn-900 border border-yarn-200/80 shadow-2xs flex items-center justify-center cursor-pointer transition-all sm:hover:scale-105 active:scale-95"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        title={t.library.deleteProject}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDeletingProjectTutorial(tutorial);
+                        }}
+                        className="h-7 w-7 rounded-lg bg-yarn-50 hover:bg-rose-50 text-yarn-600 hover:text-rose-600 border border-yarn-200/80 hover:border-rose-200 shadow-2xs flex items-center justify-center cursor-pointer transition-all sm:hover:scale-105 active:scale-95"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
 
                   {/* Title & Note (expands to keep cards aligned) */}
                   <div className="space-y-1.5 flex-1">
@@ -770,10 +814,10 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                         </span>
                         <span
                           className={`font-bold font-mono ${isCompleted
-                              ? 'text-emerald-700'
-                              : isNotStarted
-                                ? 'text-rose-600'
-                                : 'text-orange-500'
+                            ? 'text-emerald-700'
+                            : isNotStarted
+                              ? 'text-rose-600'
+                              : 'text-orange-500'
                             }`}
                         >
                           {progress}%
@@ -782,10 +826,10 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                       <div className="w-full h-1.5 rounded-full bg-yarn-100 overflow-hidden border border-yarn-200/50 p-px">
                         <div
                           className={`h-full rounded-full transition-all duration-300 ${isCompleted
-                              ? 'bg-gradient-to-r from-emerald-600 to-teal-400'
-                              : isNotStarted
-                                ? 'bg-rose-300'
-                                : 'bg-gradient-to-r from-orange-500 via-amber-400 to-orange-400'
+                            ? 'bg-gradient-to-r from-emerald-600 to-teal-400'
+                            : isNotStarted
+                              ? 'bg-rose-300'
+                              : 'bg-gradient-to-r from-orange-500 via-amber-400 to-orange-400'
                             }`}
                           style={{ width: `${progress}%` }}
                         />
@@ -806,10 +850,10 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
                       </span>
                     )}
                     <span className={`font-semibold transition-transform group-hover:translate-x-1 inline-flex items-center gap-1 ${isCompleted
-                        ? 'text-emerald-700'
-                        : isNotStarted
-                          ? 'text-rose-700'
-                          : 'text-orange-600'
+                      ? 'text-emerald-700'
+                      : isNotStarted
+                        ? 'text-rose-700'
+                        : 'text-orange-600'
                       }`}>
                       {t.library.openPattern}
                     </span>
@@ -997,24 +1041,35 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
       )}
 
       {/* Shared Unified Edit Project Details Modal */}
-      {editingTutorial && (
-        <EditProjectModal
-          isOpen={Boolean(editingTutorial)}
-          onClose={() => setEditingTutorial(null)}
-          tutorialId={editingTutorial.id}
-          initialTitle={editingTutorial.title}
-          initialNote={editingTutorial.note || null}
-          initialLevel={editingTutorial.level || null}
-          initialProjectType={editingTutorial.project_type || null}
-          initialCoverImageUrl={editingTutorial.coverImageUrl || null}
-          hasCustomCover={editingTutorial.hasCustomCover}
-          hasOriginalDoc={editingTutorial.hasOriginalDoc}
-          coverPdfUrl={editingTutorial.coverPdfUrl || null}
-          originalDocUrl={editingTutorial.originalDocUrl || null}
-          isOriginalPdf={editingTutorial.isOriginalPdf || false}
-          onSaved={handleProjectModalSaved}
-        />
-      )}
+      {editingTutorial && (() => {
+        const targetLang = locale === 'fr' ? 'fr' : (locale === 'en' ? 'en_us' : locale);
+        const matchingTrans = editingTutorial.translations?.find(
+          (tr) => tr.target_language === targetLang || (locale === 'en' && tr.target_language === 'en_uk')
+        );
+        const activeTargetLang = matchingTrans ? matchingTrans.target_language : 'original';
+        const activeTitle = (matchingTrans?.content as any)?.title || editingTutorial.title;
+
+        return (
+          <EditProjectModal
+            isOpen={Boolean(editingTutorial)}
+            onClose={() => setEditingTutorial(null)}
+            tutorialId={editingTutorial.id}
+            initialTitle={activeTitle}
+            initialNote={editingTutorial.note || null}
+            initialLevel={editingTutorial.level || null}
+            initialProjectType={editingTutorial.project_type || null}
+            initialCoverImageUrl={editingTutorial.coverImageUrl || null}
+            hasCustomCover={editingTutorial.hasCustomCover}
+            hasOriginalDoc={editingTutorial.hasOriginalDoc}
+            coverPdfUrl={editingTutorial.coverPdfUrl || null}
+            originalDocUrl={editingTutorial.originalDocUrl || null}
+            isOriginalPdf={editingTutorial.isOriginalPdf || false}
+            targetLanguage={activeTargetLang}
+            sourceLanguage={editingTutorial.raw_content_language || 'fr'}
+            onSaved={handleProjectModalSaved}
+          />
+        );
+      })()}
 
       {/* Standardized Bottom-Right Toast Notification */}
       <Toast

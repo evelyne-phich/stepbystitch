@@ -426,7 +426,7 @@ export async function POST(request: NextRequest) {
       file_path: primaryFilePath,
       file_name: primaryFileName,
       file_type: primaryFileType,
-      note: userNote || pattern.summary || null,
+      note: userNote ? userNote.trim() : null,
       raw_content: primarySourceType === 'text' ? rawText.trim() : `hash:${contentHash}`,
       raw_content_language: pattern.language || null,
       stitch: pattern.hook_size || null,
