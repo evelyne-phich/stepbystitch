@@ -259,7 +259,7 @@ export const fr = {
     deleteProject: 'Supprimer le projet',
     confirmDeleteProjectTitle: 'Supprimer ce patron ?',
     confirmDeleteProjectDesc: 'Êtes-vous sûr(e) de vouloir supprimer ce patron et toutes ses étapes ? Cette action est irréversible.',
-    confirmDeleteProjectConfirm: 'Supprimer définitivement',
+    confirmDeleteProjectConfirm: 'Supprimer',
     confirmDeleteProjectCancel: 'Annuler',
     projectDeletedToast: 'Patron supprimé de votre bibliothèque !',
     translatedFrom: 'Traduit de :',

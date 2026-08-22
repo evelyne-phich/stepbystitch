@@ -259,7 +259,7 @@ export const en = {
     deleteProject: 'Delete project',
     confirmDeleteProjectTitle: 'Delete this pattern?',
     confirmDeleteProjectDesc: 'Are you sure you want to delete this pattern and all its steps? This action cannot be undone.',
-    confirmDeleteProjectConfirm: 'Delete permanently',
+    confirmDeleteProjectConfirm: 'Delete',
     confirmDeleteProjectCancel: 'Cancel',
     projectDeletedToast: 'Pattern removed from your library!',
     translatedFrom: 'Translated from:',
