@@ -90,6 +90,31 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     }
   }
 
+  // Check custom cover image in storage
+  let coverImageUrl: string | null = null;
+  try {
+    const adminClient = await createAdminClient();
+    const folder = `${user.id}/${id}`;
+    const { data: folderFiles } = await adminClient.storage
+      .from('tutorial_files')
+      .list(folder);
+
+    const isCoverHidden = folderFiles?.some((f: any) => f.name === '.no_cover');
+    if (!isCoverHidden) {
+      const customCover = folderFiles?.find((f: any) => f.name?.startsWith('cover_'));
+      if (customCover) {
+        const { data: signedCover } = await adminClient.storage
+          .from('tutorial_files')
+          .createSignedUrl(`${folder}/${customCover.name}`, 3600);
+        coverImageUrl = signedCover?.signedUrl || null;
+      } else if (tutorial.source_type === 'image' && signedUrl) {
+        coverImageUrl = signedUrl;
+      }
+    }
+  } catch (err) {
+    console.warn('[ProjectPage] Error checking cover image in storage:', err);
+  }
+
   // 4. Pre-fetch cached translations for instant 0ms switching
   const { data: cachedTranslations } = await (supabase.from('translations') as any)
     .select('target_language, content')
@@ -111,6 +136,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       initialItems={(items || []) as ChecklistItem[]}
       signedUrl={signedUrl}
       signedUrls={signedUrls}
+      initialCoverImageUrl={coverImageUrl}
       initialTranslations={initialTranslations}
     />
   );

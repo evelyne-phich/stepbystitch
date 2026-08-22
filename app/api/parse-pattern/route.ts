@@ -392,6 +392,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // AI Validation: Ensure extracted pattern has valid steps
+    if (!pattern || !pattern.steps || pattern.steps.length === 0) {
+      console.warn('[API /api/parse-pattern] ⚠️ AI extraction returned 0 steps (not a crochet pattern). Cleaning up storage...');
+      try {
+        const adminClient = await createAdminClient();
+        const pathsToRemove = pendingUploads.map((p) => p.path);
+        if (pathsToRemove.length > 0) {
+          await adminClient.storage.from('tutorial_files').remove(pathsToRemove);
+        }
+      } catch (cleanErr) {
+        console.warn('[API /api/parse-pattern] Clean warning:', cleanErr);
+      }
+
+      return NextResponse.json(
+        {
+          error: 'INVALID_CROCHET_PATTERN',
+          message: 'Ce document ne semble pas contenir de patron de crochet valide.',
+        },
+        { status: 400 }
+      );
+    }
+
     const finalTitle = userTitle.trim() || pattern.title || primaryFileName || 'Mon patron de crochet';
 
     // 7. Insert Tutorial into Database (with resilient source_type check fallback)

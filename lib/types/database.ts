@@ -47,6 +47,7 @@ export interface Tutorial {
   stitch?: string | null;
   level?: string | null;
   project_type?: string | null;
+  cover_image_path?: string | null;
   materials?: TutorialMaterial[] | Json | null;
   gauge?: string | null;
   saved_at: string;
@@ -58,6 +59,12 @@ export interface TutorialWithProgress extends Tutorial {
   completedSteps?: number;
   progressPercent?: number;
   isCompleted?: boolean;
+  coverImageUrl?: string | null;
+  coverPdfUrl?: string | null;
+  originalDocUrl?: string | null;
+  isOriginalPdf?: boolean;
+  hasCustomCover?: boolean;
+  hasOriginalDoc?: boolean;
   translations?: Array<{ target_language: string; content: any }> | null;
 }
 

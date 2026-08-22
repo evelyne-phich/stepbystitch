@@ -292,7 +292,9 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
       }
 
       if (!response.ok || !data.success) {
-        if (data.error === 'BAD_REQUEST') {
+        if (data.error === 'INVALID_CROCHET_PATTERN') {
+          setErrorMessage(t.upload.invalidCrochetPatternError);
+        } else if (data.error === 'BAD_REQUEST') {
           setErrorMessage(t.upload.errorParseFiles);
         } else if (data.error === 'MAX_IMAGES_EXCEEDED') {
           setErrorMessage(t.upload.maxImagesExceeded);
@@ -308,10 +310,10 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
         clearTimeout(stepTimer2);
         return;
       }
-      
+
       // Clean up previews
       clearAllFiles();
-      
+
       if (data.alreadyExists) {
         setToastNotification({
           message: t.upload.alreadyExistsToast,
@@ -371,16 +373,8 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
         </div>
       )}
 
-      {/* Global Error Banner */}
-      {errorMessage && (
-        <div className="mb-8 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-8">
-        
+
         {/* TAB SELECTOR: File vs Raw Text */}
         <div className="flex items-center p-1.5 rounded-2xl bg-yarn-100/90 border border-yarn-200 shadow-inner">
           <button
@@ -390,11 +384,10 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
               setActiveTab('file');
               setErrorMessage(null);
             }}
-            className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'file'
+            className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === 'file'
                 ? 'bg-white text-yarn-950 shadow-soft'
                 : 'text-yarn-600 hover:text-yarn-900'
-            } ${isBlocked || isSubmitting ? 'cursor-not-allowed opacity-60' : ''}`}
+              } ${isBlocked || isSubmitting ? 'cursor-not-allowed opacity-60' : ''}`}
           >
             <FileText className="w-4 h-4 text-sage-600" />
             <span>{t.upload.tabFiles}</span>
@@ -407,11 +400,10 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
               setActiveTab('text');
               setErrorMessage(null);
             }}
-            className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-              activeTab === 'text'
+            className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === 'text'
                 ? 'bg-white text-yarn-950 shadow-soft'
                 : 'text-yarn-600 hover:text-yarn-900'
-            } ${isBlocked || isSubmitting ? 'cursor-not-allowed opacity-60' : ''}`}
+              } ${isBlocked || isSubmitting ? 'cursor-not-allowed opacity-60' : ''}`}
           >
             <AlignLeft className="w-4 h-4 text-sage-600" />
             <span>{t.upload.tabText}</span>
@@ -462,13 +454,12 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
                 onDragLeave={isBlocked || isSubmitting ? undefined : handleDragLeave}
                 onDrop={isBlocked || isSubmitting ? undefined : handleDrop}
                 onClick={isBlocked || isSubmitting ? undefined : () => fileInputRef.current?.click()}
-                className={`p-8 sm:p-12 rounded-3xl border-2 border-dashed text-center transition-all ${
-                  isBlocked || isSubmitting
+                className={`p-8 sm:p-12 rounded-3xl border-2 border-dashed text-center transition-all ${isBlocked || isSubmitting
                     ? 'border-yarn-300 bg-yarn-50/40 opacity-40 cursor-not-allowed'
                     : isDragging
-                    ? 'border-sage-600 bg-sage-50/70 scale-[1.01] cursor-pointer'
-                    : 'border-yarn-300 bg-white hover:border-sage-500 hover:bg-yarn-50/50 shadow-soft cursor-pointer'
-                }`}
+                      ? 'border-sage-600 bg-sage-50/70 scale-[1.01] cursor-pointer'
+                      : 'border-yarn-300 bg-white hover:border-sage-500 hover:bg-yarn-50/50 shadow-soft cursor-pointer'
+                  }`}
               >
                 <div className="w-16 h-16 rounded-3xl bg-sage-100 text-sage-700 flex items-center justify-center mx-auto mb-4">
                   <UploadCloud className="w-8 h-8" />
@@ -479,11 +470,10 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
                 <p className="text-xs sm:text-sm text-yarn-600 mb-4 max-w-md mx-auto">
                   {t.upload.dropzoneSubtitle}
                 </p>
-                <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold ${
-                  isBlocked || isSubmitting
+                <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold ${isBlocked || isSubmitting
                     ? 'bg-yarn-200 text-yarn-500 cursor-not-allowed'
                     : 'bg-yarn-100 text-yarn-800 hover:bg-yarn-200 transition-colors'
-                }`}>
+                  }`}>
                   {t.upload.dropzoneBrowse}
                 </span>
               </div>
@@ -577,11 +567,10 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
               disabled={isBlocked || isSubmitting}
               onChange={(e) => setRawText(e.target.value)}
               placeholder={isBlocked ? t.upload.quotaBlockedDropzone : t.upload.textPlaceholder}
-              className={`w-full p-4 rounded-2xl border bg-white text-sm font-mono text-yarn-900 shadow-soft focus:outline-none focus:ring-2 focus:ring-sage-500 ${
-                isBlocked || isSubmitting
+              className={`w-full p-4 rounded-2xl border bg-white text-sm font-mono text-yarn-900 shadow-soft focus:outline-none focus:ring-2 focus:ring-sage-500 ${isBlocked || isSubmitting
                   ? 'border-yarn-300 bg-yarn-50 text-yarn-400 cursor-not-allowed opacity-60'
                   : 'border-yarn-300 placeholder:text-yarn-400'
-              }`}
+                }`}
             />
             <p className="text-[11px] text-yarn-500">{t.upload.textHint}</p>
           </div>
@@ -603,9 +592,8 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
               disabled={isBlocked || isSubmitting}
               onChange={(e) => setCustomTitle(e.target.value)}
               placeholder={t.upload.patternTitlePlaceholder}
-              className={`w-full px-4 py-2.5 rounded-xl border border-yarn-200 bg-yarn-50 text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 ${
-                isBlocked || isSubmitting ? 'opacity-60 cursor-not-allowed' : 'placeholder:text-yarn-400'
-              }`}
+              className={`w-full px-4 py-2.5 rounded-xl border border-yarn-200 bg-yarn-50 text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 ${isBlocked || isSubmitting ? 'opacity-60 cursor-not-allowed' : 'placeholder:text-yarn-400'
+                }`}
             />
           </div>
 
@@ -619,9 +607,8 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
               disabled={isBlocked || isSubmitting}
               onChange={(e) => setCustomNote(e.target.value)}
               placeholder={t.upload.patternNotePlaceholder}
-              className={`w-full p-3 rounded-xl border border-yarn-200 bg-yarn-50 text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 ${
-                isBlocked || isSubmitting ? 'opacity-60 cursor-not-allowed' : 'placeholder:text-yarn-400'
-              }`}
+              className={`w-full p-3 rounded-xl border border-yarn-200 bg-yarn-50 text-sm text-yarn-900 focus:outline-none focus:ring-2 focus:ring-sage-500 ${isBlocked || isSubmitting ? 'opacity-60 cursor-not-allowed' : 'placeholder:text-yarn-400'
+                }`}
             />
           </div>
         </div>
@@ -633,13 +620,12 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
             <div className="p-6 rounded-3xl bg-sage-50/90 border border-sage-200 text-yarn-800 space-y-3.5 shadow-soft animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex items-center gap-3 text-xs font-semibold">
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    currentStepIndex > 0
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${currentStepIndex > 0
                       ? 'bg-emerald-600 text-white'
                       : currentStepIndex === 0
-                      ? 'bg-sage-700 text-white animate-pulse'
-                      : 'bg-yarn-300 text-yarn-700'
-                  }`}
+                        ? 'bg-sage-700 text-white animate-pulse'
+                        : 'bg-yarn-300 text-yarn-700'
+                    }`}
                 >
                   {currentStepIndex > 0 ? <CheckCircle2 className="w-4 h-4" /> : '1'}
                 </div>
@@ -650,13 +636,12 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
 
               <div className="flex items-center gap-3 text-xs font-semibold">
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    currentStepIndex > 1
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${currentStepIndex > 1
                       ? 'bg-emerald-600 text-white'
                       : currentStepIndex === 1
-                      ? 'bg-sage-700 text-white animate-pulse'
-                      : 'bg-yarn-300 text-yarn-700'
-                  }`}
+                        ? 'bg-sage-700 text-white animate-pulse'
+                        : 'bg-yarn-300 text-yarn-700'
+                    }`}
                 >
                   {currentStepIndex > 1 ? <CheckCircle2 className="w-4 h-4" /> : '2'}
                 </div>
@@ -667,11 +652,10 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
 
               <div className="flex items-center gap-3 text-xs font-semibold">
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    currentStepIndex >= 2
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${currentStepIndex >= 2
                       ? 'bg-sage-700 text-white animate-spin'
                       : 'bg-yarn-300 text-yarn-700'
-                  }`}
+                    }`}
                 >
                   {currentStepIndex >= 2 ? <Loader2 className="w-3.5 h-3.5" /> : '3'}
                 </div>
@@ -704,11 +688,10 @@ export function UploadDropzone({ quota }: UploadDropzoneProps = {}) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`w-full py-4 px-6 rounded-2xl text-base font-bold text-white shadow-lift flex items-center justify-center gap-2 transition-all transform ${
-                isSubmitting
+              className={`w-full py-4 px-6 rounded-2xl text-base font-bold text-white shadow-lift flex items-center justify-center gap-2 transition-all transform ${isSubmitting
                   ? 'bg-yarn-400 cursor-not-allowed opacity-90'
                   : 'bg-gradient-to-r from-sage-800 via-sage-700 to-sage-600 hover:from-sage-900 hover:to-sage-700 hover:-translate-y-0.5 shadow-soft hover:shadow-lift'
-              }`}
+                }`}
             >
               {isSubmitting ? (
                 <>

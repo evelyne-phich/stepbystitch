@@ -101,6 +101,64 @@ interface CategoryBadgeProps {
   className?: string;
 }
 
+export function getCategoryGradient(category?: string | null): string {
+  if (!category) return 'from-[#FAF6F0] via-[#F5EEE6] to-[#ECE3D6]';
+  const norm = category.toLowerCase().trim();
+  switch (norm) {
+    case 'amigurumi':
+      return 'from-purple-100/95 via-pink-50/90 to-purple-200/80';
+    case 'accessory':
+    case 'accessories':
+      return 'from-amber-100/95 via-orange-50/90 to-amber-200/80';
+    case 'garment':
+    case 'clothing':
+      return 'from-sky-100/95 via-indigo-50/90 to-sky-200/80';
+    case 'blanket':
+      return 'from-rose-100/95 via-pink-50/90 to-rose-200/80';
+    case 'home':
+    case 'decoration':
+      return 'from-emerald-100/95 via-teal-50/90 to-emerald-200/80';
+    default:
+      return 'from-yarn-100/95 via-sage-50/90 to-yarn-200/80';
+  }
+}
+
+export function CraftVignette({
+  category,
+  title,
+  className = '',
+}: {
+  category?: string | null;
+  title?: string;
+  className?: string;
+}) {
+  const gradient = getCategoryGradient(category);
+  const style = getCategoryStyle(category);
+
+  return (
+    <div
+      className={`w-full h-full bg-gradient-to-br ${gradient} p-4 flex flex-col items-center justify-center relative overflow-hidden select-none ${className}`}
+    >
+      {/* Decorative craft circles */}
+      <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full border-4 border-white/40 pointer-events-none" />
+      <div className="absolute -left-8 -bottom-8 w-36 h-36 rounded-full border-4 border-white/30 pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(#00000008_1px,transparent_1px)] [background-size:12px_12px] opacity-60 pointer-events-none" />
+
+      {/* Tactile central artisan badge */}
+      <div className="relative z-10 flex flex-col items-center gap-2 group-hover:scale-105 transition-transform duration-300">
+        <div className="w-13 h-13 sm:w-15 sm:h-15 rounded-2xl sm:rounded-3xl bg-white/95 border border-white/90 shadow-lift flex items-center justify-center backdrop-blur-xs">
+          <CategoryIcon category={category} className={`w-6 h-6 sm:w-7 sm:h-7 ${style.iconColor}`} />
+        </div>
+        {title && (
+          <span className="text-[11px] sm:text-xs font-serif font-bold text-yarn-900/90 line-clamp-1 max-w-[180px] text-center px-2.5 py-0.5 rounded-full bg-white/80 backdrop-blur-2xs border border-white/70 shadow-2xs">
+            {title}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function CategoryBadge({ category, label, className = '' }: CategoryBadgeProps) {
   if (!category && !label) return null;
   const style = getCategoryStyle(category);

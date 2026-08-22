@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Sparkles, Menu, X, Layers, HelpCircle, CreditCard } from 'lucide-react';
+import { Sparkles, Menu, X, Layers, HelpCircle, CreditCard, Plus } from 'lucide-react';
 import { useAuth } from '@/lib/supabase/hooks';
 import { LanguageSwitcher } from '@/components/ui/language-switcher';
 import { useI18n } from '@/lib/i18n/context';
@@ -67,13 +67,22 @@ export function Navbar() {
             <div className="h-5 w-px bg-yarn-300" />
 
             {!loading && user ? (
-              <Link
-                href="/library"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-yarn-900 hover:bg-yarn-950 shadow-soft transition-all transform hover:-translate-y-0.5 whitespace-nowrap"
-              >
-                <Layers className="w-4 h-4" />
-                <span>{t.common.myLibrary}</span>
-              </Link>
+              <div className="flex items-center gap-2.5">
+                <Link
+                  href="/library/new"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-sage-800 to-sage-600 hover:from-sage-900 hover:to-sage-700 shadow-soft hover:shadow-lift transition-all transform hover:-translate-y-0.5 whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{t.common.importPattern}</span>
+                </Link>
+                <Link
+                  href="/library"
+                  className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-yarn-800 bg-white border border-yarn-200 hover:border-yarn-400 hover:bg-yarn-50 hover:text-yarn-950 shadow-2xs hover:shadow-soft transition-all transform hover:-translate-y-0.5 active:scale-[0.98] whitespace-nowrap"
+                >
+                  <Layers className="w-4 h-4 text-yarn-600 group-hover:text-yarn-900 group-hover:scale-110 transition-transform duration-200" />
+                  <span>{t.common.myLibrary}</span>
+                </Link>
+              </div>
             ) : (
               <div className="flex items-center gap-2.5">
                 <Link
@@ -146,13 +155,24 @@ export function Navbar() {
 
           <div className="pt-4 mt-2 border-t border-yarn-200 flex flex-col gap-2.5">
             {!loading && user ? (
-              <Link
-                href="/library"
-                onClick={() => setIsOpen(false)}
-                className="w-full text-center py-3 rounded-xl font-semibold text-white bg-yarn-900 hover:bg-yarn-950 shadow-soft"
-              >
-                {t.common.myLibrary}
-              </Link>
+              <>
+                <Link
+                  href="/library/new"
+                  onClick={() => setIsOpen(false)}
+                  className="w-full text-center py-3 rounded-xl font-bold text-white bg-gradient-to-r from-sage-800 to-sage-600 shadow-soft flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{t.common.importPattern}</span>
+                </Link>
+                <Link
+                  href="/library"
+                  onClick={() => setIsOpen(false)}
+                  className="w-full text-center py-2.5 rounded-xl font-semibold text-yarn-900 bg-yarn-100 hover:bg-yarn-200 shadow-soft flex items-center justify-center gap-2"
+                >
+                  <Layers className="w-4 h-4 text-yarn-700" />
+                  <span>{t.common.myLibrary}</span>
+                </Link>
+              </>
             ) : (
               <>
                 <Link

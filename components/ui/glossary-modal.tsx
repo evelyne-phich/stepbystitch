@@ -1,8 +1,12 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useI18n } from '@/lib/i18n/context';
 import { X, Search, BookOpen } from 'lucide-react';
+
+import { en } from '@/lib/i18n/dictionaries/en';
+import { fr } from '@/lib/i18n/dictionaries/fr';
 
 export interface StitchGlossaryItem {
   keyFr: string;
@@ -100,11 +104,13 @@ export const GLOSSARY_ITEMS: StitchGlossaryItem[] = [
 interface GlossaryModalProps {
   isOpen: boolean;
   onClose: () => void;
+  language?: string;
 }
 
-export function GlossaryModal({ isOpen, onClose }: GlossaryModalProps) {
-  const { t, locale } = useI18n();
-  const isFr = locale === 'fr';
+export function GlossaryModal({ isOpen, onClose, language }: GlossaryModalProps) {
+  const { t: appDict, locale } = useI18n();
+  const isFr = language ? language === 'fr' : locale === 'fr';
+  const t = language ? (language === 'fr' ? fr : en) : (locale === 'en' ? en : appDict);
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -143,14 +149,20 @@ export function GlossaryModal({ isOpen, onClose }: GlossaryModalProps) {
     });
   }, [searchQuery, isFr]);
 
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-6">
       {/* Backdrop */}
       <div
         onClick={onClose}
-        className="fixed inset-0 bg-yarn-950/60 backdrop-blur-md animate-backdrop-fade transition-opacity"
+        className="fixed inset-0 bg-yarn-950/65 backdrop-blur-xs animate-backdrop-fade transition-opacity"
       />
 
       {/* Modal / Mobile Drawer Card (Fixed height, smooth slide up transition on mobile) */}
@@ -236,6 +248,7 @@ export function GlossaryModal({ isOpen, onClose }: GlossaryModalProps) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
