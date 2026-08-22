@@ -203,10 +203,9 @@ interface GlossaryModalProps {
 }
 
 export function GlossaryModal({ isOpen, onClose, language }: GlossaryModalProps) {
-  const { t: appDict, locale } = useI18n();
+  const { t, locale } = useI18n();
   const patternLang = language || locale || 'fr';
   const isFr = locale === 'fr';
-  const t = locale === 'en' ? en : appDict;
 
   const [searchQuery, setSearchQuery] = useState('');
 

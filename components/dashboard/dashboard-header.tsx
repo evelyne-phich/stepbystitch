@@ -23,8 +23,8 @@ export function DashboardHeader({ userName }: DashboardHeaderProps) {
   return (
     <header
       className={`${
-        isTutorialPage ? 'relative' : 'sticky top-0 z-50'
-      } bg-white/95 backdrop-blur-md border-b border-yarn-200 shadow-soft w-full overflow-hidden transition-all`}
+        isTutorialPage ? 'relative z-50' : 'sticky top-0 z-50'
+      } bg-white/95 backdrop-blur-md border-b border-yarn-200 shadow-soft w-full transition-all`}
     >
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20 gap-2">

@@ -30,7 +30,7 @@ export function Footer() {
               <Heart className="w-3.5 h-3.5 text-sage-400 fill-sage-400" />
             </div>
             <div className="pt-2">
-              <LanguageSwitcher />
+              <LanguageSwitcher dropUp />
             </div>
           </div>
 
@@ -109,7 +109,7 @@ export function Footer() {
                   href={locale === 'fr' ? '/cgu' : '/terms'}
                   className="hover:text-white transition-colors"
                 >
-                  {locale === 'fr' ? 'Conditions d’Utilisation (CGU)' : 'Terms of Service'}
+                  {t.cgu.title}
                 </Link>
               </li>
               <li>

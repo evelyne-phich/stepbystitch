@@ -456,14 +456,15 @@ export function ProjectDetailView({
   initialCoverImageUrl = null,
   initialTranslations = {},
 }: ProjectDetailViewProps) {
-  const { t: appDict, locale } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
 
   // Multi-Language AI Translation State
   // Automatically activate the translated version if it matches the current site locale
   const initialPreferredLanguage = (() => {
-    if (locale === 'fr' && initialTranslations?.['fr']) return 'fr';
-    if (locale === 'en' && initialTranslations?.['en_us']) return 'en_us';
+    const langKey = locale === 'en' ? 'en_us' : locale;
+    if (initialTranslations?.[langKey]) return langKey;
+    if (locale === 'en' && initialTranslations?.['en_uk']) return 'en_uk';
     return 'original';
   })();
 
@@ -474,9 +475,6 @@ export function ProjectDetailView({
   const activePatternLang = currentLanguage === 'original' ? sourceLang.code : currentLanguage;
   const isPatternEnglish = activePatternLang === 'en' || activePatternLang === 'en_us' || activePatternLang === 'en_uk';
   const isPatternFrench = activePatternLang === 'fr';
-
-  // App UI Dictionary (follows user navigation locale):
-  const t = locale === 'en' ? en : appDict;
 
   // Pattern Tutorial Card Labels (follows active pattern language):
   const cardLabels =

@@ -297,7 +297,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
   const completedCount = filteredByLevelAndCategory.filter((t) => !!t.isCompleted).length;
 
   const getLocalizedTutorialData = (tutorial: TutorialWithProgress) => {
-    const targetLang = locale === 'fr' ? 'fr' : (locale === 'en' ? 'en_us' : locale);
+    const targetLang = locale === 'en' ? 'en_us' : locale;
     const matchingTrans = tutorial.translations?.find(
       (tr) => tr.target_language === targetLang || (locale === 'en' && tr.target_language === 'en_uk')
     );
@@ -1042,7 +1042,7 @@ export function LibraryView({ initialTutorials }: LibraryViewProps) {
 
       {/* Shared Unified Edit Project Details Modal */}
       {editingTutorial && (() => {
-        const targetLang = locale === 'fr' ? 'fr' : (locale === 'en' ? 'en_us' : locale);
+        const targetLang = locale === 'en' ? 'en_us' : locale;
         const matchingTrans = editingTutorial.translations?.find(
           (tr) => tr.target_language === targetLang || (locale === 'en' && tr.target_language === 'en_uk')
         );

@@ -16,7 +16,7 @@ export default async function LibraryPage() {
       .from('tutorials') as any)
       .select('*, checklist_items(id, checked), translations(target_language, content)')
       .order('saved_at', { ascending: false });
-    
+
     if (error) {
       console.error('[LibraryPage] Error fetching tutorials with checklist_items:', error);
     }
