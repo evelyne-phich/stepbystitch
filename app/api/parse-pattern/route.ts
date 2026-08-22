@@ -483,6 +483,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 9. Pre-populate translations if globally cached in app_settings
+    if (contentHash) {
+      try {
+        const adminClient = await createAdminClient();
+        const { data: cachedTrRows } = await (adminClient.from('app_settings') as any)
+          .select('key, value')
+          .like('key', `tr:${contentHash}:%`);
+
+        if (cachedTrRows && cachedTrRows.length > 0) {
+          const translationsToInsert = cachedTrRows.map((row: any) => {
+            // key format: tr:<contentHash>:<targetLanguage> or tr:<contentHash>:<targetLanguage>:<promptHash>
+            const parts = row.key.split(':');
+            const targetLang = parts[2] || parts[1];
+            return {
+              tutorial_id: tutorial.id,
+              target_language: targetLang,
+              status: 'done',
+              content: row.value,
+              updated_at: new Date().toISOString(),
+            };
+          });
+
+          const { error: trInsertErr } = await (supabase.from('translations') as any).upsert(
+            translationsToInsert,
+            { onConflict: 'tutorial_id, target_language' }
+          );
+
+          if (!trInsertErr) {
+            console.log(`[API /api/parse-pattern] ⚡ Pre-populated ${translationsToInsert.length} cached translations for tutorial ${tutorial.id}`);
+          }
+        }
+      } catch (trPopErr) {
+        console.warn(`[API /api/parse-pattern] ⚠️ Failed to pre-populate cached translations:`, trPopErr);
+      }
+    }
+
     const totalDuration = Date.now() - requestStartTime;
     console.log(
       `[API /api/parse-pattern] 🎉 Pattern ingestion completed in ${totalDuration}ms (cacheHit=${isCacheHit}). Tutorial ID: ${tutorial.id}`

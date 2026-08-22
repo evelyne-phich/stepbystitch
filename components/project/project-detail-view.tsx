@@ -519,6 +519,12 @@ export function ProjectDetailView({
   const hookInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (tutorial.stitch !== undefined) {
+      setProjectStitch(tutorial.stitch || '');
+    }
+  }, [tutorial.stitch]);
+
+  useEffect(() => {
     if (isEditingHook) {
       hookInputRef.current?.focus();
       hookInputRef.current?.select();
@@ -540,6 +546,7 @@ export function ProjectDetailView({
         targetLanguage: currentLanguage,
       });
       setProjectStitch(trimmed);
+      setHookInput(trimmed);
       setIsEditingHook(false);
       setTranslationToast({
         message: t.project.detailsSavedToast,
@@ -1572,7 +1579,7 @@ export function ProjectDetailView({
         {/* Checklist & Pattern Details Column */}
         <div className="space-y-8 w-full">
           {/* Materials Checklist Card (Open by default, auto-collapses when done) */}
-          {(materialsList.length > 0 || projectStitch || tutorial.stitch) && (() => {
+          {(materialsList.length > 0 || projectStitch) && (() => {
             const isMaterialsDone = materialsList.length > 0 && checkedMaterials.size === materialsList.length;
             const isMaterialsCollapsed = materialsOverride !== undefined
               ? materialsOverride
@@ -1594,7 +1601,7 @@ export function ProjectDetailView({
                   onChange={(e) => setHookInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Escape') {
-                      setHookInput(projectStitch || tutorial.stitch || '');
+                      setHookInput(projectStitch || '');
                       setIsEditingHook(false);
                     }
                   }}
@@ -1616,7 +1623,7 @@ export function ProjectDetailView({
                 <button
                   type="button"
                   onClick={() => {
-                    setHookInput(projectStitch || tutorial.stitch || '');
+                    setHookInput(projectStitch || '');
                     setIsEditingHook(false);
                   }}
                   title={t.project.cancelEdit}
@@ -1630,7 +1637,7 @@ export function ProjectDetailView({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setHookInput(projectStitch || tutorial.stitch || '');
+                  setHookInput(projectStitch || '');
                   setIsEditingHook(true);
                 }}
                 title="Modifier la taille du crochet"
@@ -1638,7 +1645,7 @@ export function ProjectDetailView({
               >
                 <span className="font-semibold text-yarn-900">{cardLabels.hook} :</span>
                 <span className="font-mono font-bold text-sage-800">
-                  {projectStitch || tutorial.stitch || '—'}
+                  {projectStitch || '—'}
                 </span>
                 <Edit2 className="w-3 h-3 text-yarn-400 group-hover/hook:text-sage-700 transition-colors ml-0.5" />
               </button>

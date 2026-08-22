@@ -127,15 +127,29 @@ export async function updateTutorialDetails(
     throw new Error('Unauthorized');
   }
 
+  // Fetch current tutorial to check if title was explicitly modified
+  const { data: currentTutorial } = await (supabase.from('tutorials') as any)
+    .select('title')
+    .eq('id', tutorialId)
+    .eq('user_id', user.id)
+    .single();
+
+  const newTitle = updates.title.trim();
+  const isTitleModifiedByUser = Boolean(currentTutorial && newTitle && newTitle !== currentTutorial.title);
+
   // 1. Update universal project attributes on the tutorials table (including universal title & notes)
   const tutorialFieldsToUpdate: Record<string, any> = {
-    title: updates.title.trim(),
-    note: updates.note ? updates.note.trim() : null,
-    stitch: updates.stitch ? updates.stitch.trim() : null,
-    level: updates.level ? updates.level.trim() : null,
-    project_type: updates.project_type ? updates.project_type.trim() : null,
+    title: newTitle,
+    note: updates.note !== undefined ? (updates.note ? updates.note.trim() : null) : undefined,
+    stitch: updates.stitch !== undefined ? (updates.stitch ? updates.stitch.trim() : null) : undefined,
+    level: updates.level !== undefined ? (updates.level ? updates.level.trim() : null) : undefined,
+    project_type: updates.project_type !== undefined ? (updates.project_type ? updates.project_type.trim() : null) : undefined,
     updated_at: new Date().toISOString(),
   };
+
+  Object.keys(tutorialFieldsToUpdate).forEach((k) => {
+    if (tutorialFieldsToUpdate[k] === undefined) delete tutorialFieldsToUpdate[k];
+  });
 
   const { error } = await (supabase.from('tutorials') as any)
     .update(tutorialFieldsToUpdate)
@@ -147,32 +161,33 @@ export async function updateTutorialDetails(
     throw new Error('Failed to update project details');
   }
 
-  // 2. Synchronize title and note across all cached translations for this tutorial
-  try {
-    const { data: translations } = await (supabase.from('translations') as any)
-      .select('id, content')
-      .eq('tutorial_id', tutorialId);
+  // 2. Only if the user explicitly customized/renamed the title, sync that custom title into translations
+  if (isTitleModifiedByUser) {
+    try {
+      const { data: translations } = await (supabase.from('translations') as any)
+        .select('id, content')
+        .eq('tutorial_id', tutorialId);
 
-    if (translations && translations.length > 0) {
-      for (const trRow of translations) {
-        if (trRow && trRow.content && typeof trRow.content === 'object') {
-          const updatedContent = {
-            ...trRow.content,
-            title: updates.title.trim(),
-            note: updates.note ? updates.note.trim() : null,
-          };
+      if (translations && translations.length > 0) {
+        for (const trRow of translations) {
+          if (trRow && trRow.content && typeof trRow.content === 'object') {
+            const updatedContent = {
+              ...trRow.content,
+              title: newTitle,
+            };
 
-          await (supabase.from('translations') as any)
-            .update({
-              content: updatedContent,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', trRow.id);
+            await (supabase.from('translations') as any)
+              .update({
+                content: updatedContent,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', trRow.id);
+          }
         }
       }
+    } catch (trErr) {
+      console.warn('[Action updateTutorialDetails] Error syncing translations:', trErr);
     }
-  } catch (trErr) {
-    console.warn('[Action updateTutorialDetails] Error syncing translations:', trErr);
   }
 
   revalidatePath(`/library/${tutorialId}`);
@@ -544,7 +559,7 @@ export async function getOrTranslatePatternAction(
   }
 
   try {
-    // 2. Check if translation is already cached in Supabase (if not forced to refresh)
+    // 2. Check if translation is already cached in Supabase translations table (if not forced to refresh)
     if (!forceRefresh) {
       const { data: existingTranslation } = await (supabase.from('translations') as any)
         .select('content, status')
@@ -559,6 +574,52 @@ export async function getOrTranslatePatternAction(
           cached: true,
           content: existingTranslation.content,
         };
+      }
+    }
+
+    // 2.b Check Global Translation Cache in app_settings by contentHash and prompt hash
+    const { data: tutorialData } = await (supabase.from('tutorials') as any)
+      .select('raw_content')
+      .eq('id', tutorialId)
+      .single();
+
+    const rawContent = tutorialData?.raw_content || '';
+    const contentHash = rawContent.startsWith('hash:') ? rawContent.replace('hash:', '') : null;
+
+    const { getTranslationCacheKey, translateCrochetPatternWithGemini } = await import('@/lib/ai/translator');
+
+    if (!forceRefresh && contentHash) {
+      try {
+        const adminClient = await createAdminClient();
+        const globalCacheKey = getTranslationCacheKey(contentHash, targetLanguage);
+        const { data: globalTr } = await (adminClient.from('app_settings') as any)
+          .select('value')
+          .eq('key', globalCacheKey)
+          .single();
+
+        if (globalTr && globalTr.value) {
+          console.log(`[Action getOrTranslatePattern] ⚡ Global Cache HIT for key ${globalCacheKey}`);
+
+          // Cache in current user's translations table for this tutorial
+          await (supabase.from('translations') as any).upsert(
+            {
+              tutorial_id: tutorialId,
+              target_language: targetLanguage,
+              status: 'done',
+              content: globalTr.value,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'tutorial_id, target_language' }
+          );
+
+          return {
+            success: true,
+            cached: true,
+            content: globalTr.value,
+          };
+        }
+      } catch (globalErr) {
+        console.warn(`[Action getOrTranslatePattern] Global cache lookup warning:`, globalErr);
       }
     }
 
@@ -601,7 +662,6 @@ export async function getOrTranslatePatternAction(
     const sections = Array.from(sectionSet);
 
     // 5. Execute translation via AI Engine
-    const { translateCrochetPatternWithGemini } = await import('@/lib/ai/translator');
     const result = await translateCrochetPatternWithGemini({
       tutorialId,
       title: tutorial.title,
@@ -627,6 +687,25 @@ export async function getOrTranslatePatternAction(
 
     if (upsertError) {
       console.warn('[Action getOrTranslatePattern] ⚠️ Failed to cache translation in Supabase:', upsertError);
+    }
+
+    // 6.b Save into global app_settings translation cache with prompt hash key
+    if (contentHash) {
+      try {
+        const adminClient = await createAdminClient();
+        const globalCacheKey = getTranslationCacheKey(contentHash, targetLanguage);
+        await (adminClient.from('app_settings') as any).upsert(
+          {
+            key: globalCacheKey,
+            value: result.content,
+            description: `Global translation cache for ${globalCacheKey}`,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'key' }
+        );
+      } catch (globalSaveErr) {
+        console.warn('[Action getOrTranslatePattern] ⚠️ Failed to save to global cache:', globalSaveErr);
+      }
     }
 
     // 7. Record token consumption in ai_usage table

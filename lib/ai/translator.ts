@@ -1,5 +1,17 @@
+import crypto from 'crypto';
 import { GoogleGenAI } from '@google/genai';
 import type { ChecklistItem, TutorialMaterial } from '@/lib/types/database';
+
+export const TRANSLATION_PROMPT_VERSION = 'v1.0';
+
+export function getTranslationCacheKey(contentHash: string, targetLanguage: string): string {
+  const promptHash = crypto
+    .createHash('sha256')
+    .update(`${TRANSLATION_PROMPT_VERSION}:${CROCHET_TRANSLATOR_SYSTEM_INSTRUCTION}`)
+    .digest('hex')
+    .slice(0, 12);
+  return `tr:${contentHash}:${targetLanguage}:${promptHash}`;
+}
 
 export type TranslationLanguage =
   | 'fr'

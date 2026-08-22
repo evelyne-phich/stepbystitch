@@ -130,6 +130,30 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     });
   }
 
+  // If missing translations, check global app_settings cache by contentHash
+  const rawContent = tutorial.raw_content || '';
+  const contentHash = rawContent.startsWith('hash:') ? rawContent.replace('hash:', '') : null;
+  if (contentHash) {
+    try {
+      const adminClient = await createAdminClient();
+      const { data: globalTrRows } = await (adminClient.from('app_settings') as any)
+        .select('key, value')
+        .like('key', `tr:${contentHash}:%`);
+
+      if (globalTrRows && globalTrRows.length > 0) {
+        globalTrRows.forEach((row: any) => {
+          const parts = row.key.split(':');
+          const targetLang = parts[2] || parts[1];
+          if (targetLang && !initialTranslations[targetLang] && row.value) {
+            initialTranslations[targetLang] = row.value;
+          }
+        });
+      }
+    } catch (globalTrErr) {
+      console.warn('[ProjectPage] Error checking global translation cache:', globalTrErr);
+    }
+  }
+
   return (
     <ProjectDetailView
       tutorial={tutorial as Tutorial}
